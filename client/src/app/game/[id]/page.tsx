@@ -21,7 +21,8 @@ import {
   parseTableState,
   TABLE_OFFSETS as OG_TABLE_OFFSETS,
 } from '@/lib/onchain-game';
-import { deriveX25519Keypair } from '@/lib/arcium-keys';
+import { deriveX25519Keypair, getCachedX25519Keypair, getMxeX25519Pubkey, type X25519Keypair } from '@/lib/arcium-keys';
+import { useArciumCards } from '@/hooks/useArciumCards';
 import { getAssociatedTokenAddress, createAssociatedTokenAccountInstruction } from '@solana/spl-token';
 import { getPlayerPda } from '@/lib/pda';
 import { setActiveTable, removeActiveGame, addActiveGame } from '@/components/layout/ActiveTableBar';
@@ -139,7 +140,32 @@ export default function CashGamePage() {
   const prevPhaseRef = useRef<string | null>(null);
   const lastOnChainRef = useRef<typeof gameState>(null);
 
-  // Arcium L1: no TEE auth needed — card privacy via MPC encryption
+  // Arcium card decryption: x25519 keypair + MXE pubkey → Rescue cipher decrypt
+  const [x25519Kp, setX25519Kp] = useState<X25519Keypair | null>(null);
+  const [mxePubkey, setMxePubkey] = useState<Uint8Array | null>(null);
+
+  // Auto-load cached x25519 keypair + MXE pubkey on mount
+  useEffect(() => {
+    if (!publicKey) return;
+    getCachedX25519Keypair(publicKey.toBase58()).then(kp => {
+      if (kp) setX25519Kp(kp);
+    }).catch(() => {});
+    // MXE pubkey from env var (static per Arcium deployment)
+    const envHex = process.env.NEXT_PUBLIC_MXE_X25519_PUBKEY;
+    if (envHex && envHex.length === 64) {
+      setMxePubkey(Uint8Array.from(envHex.match(/.{2}/g)!.map(b => parseInt(b, 16))));
+    }
+  }, [publicKey?.toBase58()]);
+
+  // Decrypt encrypted hole cards during active play
+  const arciumSeatIndex = gameState?.mySeatIndex ?? null;
+  const arciumTablePda = tablePubkey ? (() => { try { return new PublicKey(tablePubkey); } catch { return null; } })() : null;
+  const { holeCards: arciumCards } = useArciumCards(
+    arciumTablePda,
+    arciumSeatIndex !== null && arciumSeatIndex >= 0 ? arciumSeatIndex : null,
+    x25519Kp,
+    mxePubkey,
+  );
 
   // Track active table in localStorage for the ActiveTableBar component
   useEffect(() => {
@@ -619,6 +645,7 @@ export default function CashGamePage() {
           keyTx.recentBlockhash = (await conn.getLatestBlockhash('confirmed')).blockhash;
           const keySig = await sendTransaction(keyTx, conn, { skipPreflight: true });
           await conn.confirmTransaction(keySig, 'confirmed');
+          setX25519Kp(x25519Kp);
           console.log('[confirmBuyIn] x25519 key set:', keySig);
         }
       } catch (keyErr: any) {
@@ -932,10 +959,19 @@ export default function CashGamePage() {
     }
   }, [publicKey, sendTransaction, tablePubkey, unclaimedSol]);
 
+  // ─── Merge Arcium-decrypted cards into myCards ───
+  // During active play, gameState.myCards is undefined (plaintext 255).
+  // arciumCards has the Rescue cipher decrypted values.
+  const effectiveMyCards: [number, number] | undefined = (() => {
+    if (gameState?.myCards) return gameState.myCards;
+    if (arciumCards[0] && arciumCards[1]) return [arciumCards[0].value, arciumCards[1].value] as [number, number];
+    return undefined;
+  })();
+
   // ─── Derive display state (showdown hold overrides live state) ───
   const displayState = (() => {
     if (!gameState) return null;
-    if (!showdownHold || !showdownSnapshot) return gameState;
+    if (!showdownHold || !showdownSnapshot) return { ...gameState, myCards: effectiveMyCards };
 
     // During showdown hold, override phase/pot/cards with snapshot
     // but merge revealed hole cards from live on-chain data
