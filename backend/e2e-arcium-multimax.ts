@@ -452,57 +452,52 @@ async function runMultiPlayerTest(conn: Connection, config: TestConfig) {
     return -1;
   }
 
-  /** Queue showdown reveals for all active (non-folded) seats and wait. */
+  /** Queue reveal_all_showdown — single MPC call reveals ALL active players' hole cards. */
   async function queueShowdownAndWait(): Promise<number> {
-    const showCompDefOffset = Buffer.from(getCompDefAccOffset('reveal_player_cards')).readUInt32LE(0);
+    const showCompDefOffset = Buffer.from(getCompDefAccOffset('reveal_all_showdown')).readUInt32LE(0);
     const showCompDefAccount = getCompDefAccAddress(PROGRAM_ID, showCompDefOffset);
 
     const s = await getTableState();
     const activeMask = s.occ & ~s.folded;
     const activeSeats: number[] = [];
     for (let i = 0; i < maxPlayers; i++) if (activeMask & (1 << i)) activeSeats.push(i);
-    console.log(`  Showdown: ${activeSeats.length} active seats: [${activeSeats.join(', ')}]`);
+    console.log(`  Showdown: ${activeSeats.length} active seats: [${activeSeats.join(', ')}] (single MPC call)`);
 
-    for (const seatIdx of activeSeats) {
-      const showCompOffset = BigInt(Date.now()) * BigInt(1000) + BigInt(seatIdx);
-      const showCompOffsetBuf = Buffer.alloc(8);
-      showCompOffsetBuf.writeBigUInt64LE(showCompOffset);
-      const showComputationAccount = getComputationAccAddress(
-        clusterOffset,
-        { toArrayLike: (_B: any, _e: string, l: number) => { const b = Buffer.alloc(l); showCompOffsetBuf.copy(b); return b; } } as any,
-      );
+    const showCompOffset = BigInt(Date.now()) * BigInt(1000) + BigInt(999);
+    const showCompOffsetBuf = Buffer.alloc(8);
+    showCompOffsetBuf.writeBigUInt64LE(showCompOffset);
+    const showComputationAccount = getComputationAccAddress(
+      clusterOffset,
+      { toArrayLike: (_B: any, _e: string, l: number) => { const b = Buffer.alloc(l); showCompOffsetBuf.copy(b); return b; } } as any,
+    );
 
-      const showData = Buffer.alloc(17);
-      IX.arcium_showdown_queue.copy(showData, 0);
-      showData.writeBigUInt64LE(showCompOffset, 8);
-      showData.writeUInt8(seatIdx, 16);
+    // IX data: disc(8) + computation_offset(8) = 16 bytes
+    // active_mask is computed on-chain from table state
+    const showData = Buffer.alloc(16);
+    IX.arcium_showdown_queue.copy(showData, 0);
+    showData.writeBigUInt64LE(showCompOffset, 8);
 
-      const seatCardsPda = getSeatCards(tablePDA, seatIdx);
-
-      const ok = await send(conn, new TransactionInstruction({
-        programId: PROGRAM_ID,
-        keys: [
-          { pubkey: players[0].publicKey,           isSigner: true,  isWritable: true },
-          { pubkey: getSignPda(),                   isSigner: false, isWritable: true },
-          { pubkey: mxeAccount,                     isSigner: false, isWritable: false },
-          { pubkey: getMempoolAccAddress(clusterOffset), isSigner: false, isWritable: true },
-          { pubkey: getExecutingPoolAccAddress(clusterOffset), isSigner: false, isWritable: true },
-          { pubkey: showComputationAccount,         isSigner: false, isWritable: true },
-          { pubkey: showCompDefAccount,             isSigner: false, isWritable: false },
-          { pubkey: clusterAccount,                 isSigner: false, isWritable: true },
-          { pubkey: getArciumFeePoolPda(),          isSigner: false, isWritable: true },
-          { pubkey: getArciumClockPda(),            isSigner: false, isWritable: true },
-          { pubkey: ARCIUM_PROG_ID,                 isSigner: false, isWritable: false },
-          { pubkey: tablePDA,                       isSigner: false, isWritable: true },
-          { pubkey: getDeckState(tablePDA),         isSigner: false, isWritable: true },
-          { pubkey: SystemProgram.programId,        isSigner: false, isWritable: false },
-          { pubkey: seatCardsPda,                   isSigner: false, isWritable: false },
-        ],
-        data: showData,
-      }), [players[0]], `showdown_queue(seat${seatIdx})`);
-      if (!ok) return -1;
-      await new Promise(r => setTimeout(r, 500));
-    }
+    const ok = await send(conn, new TransactionInstruction({
+      programId: PROGRAM_ID,
+      keys: [
+        { pubkey: players[0].publicKey,           isSigner: true,  isWritable: true },
+        { pubkey: getSignPda(),                   isSigner: false, isWritable: true },
+        { pubkey: mxeAccount,                     isSigner: false, isWritable: false },
+        { pubkey: getMempoolAccAddress(clusterOffset), isSigner: false, isWritable: true },
+        { pubkey: getExecutingPoolAccAddress(clusterOffset), isSigner: false, isWritable: true },
+        { pubkey: showComputationAccount,         isSigner: false, isWritable: true },
+        { pubkey: showCompDefAccount,             isSigner: false, isWritable: false },
+        { pubkey: clusterAccount,                 isSigner: false, isWritable: true },
+        { pubkey: getArciumFeePoolPda(),          isSigner: false, isWritable: true },
+        { pubkey: getArciumClockPda(),            isSigner: false, isWritable: true },
+        { pubkey: ARCIUM_PROG_ID,                 isSigner: false, isWritable: false },
+        { pubkey: tablePDA,                       isSigner: false, isWritable: true },
+        { pubkey: getDeckState(tablePDA),         isSigner: false, isWritable: true },
+        { pubkey: SystemProgram.programId,        isSigner: false, isWritable: false },
+      ],
+      data: showData,
+    }), [players[0]], `showdown_queue(reveal_all)`);
+    if (!ok) return -1;
 
     const start = Date.now();
     while (Date.now() - start < 20 * 60 * 1000) {
@@ -523,14 +518,12 @@ async function runMultiPlayerTest(conn: Connection, config: TestConfig) {
   }
 
   // ═══════════════════════════════════════════════════════════════════
-  // HAND 1: Deal with N players, P2+ fold preflop → P0+P1 showdown
-  // SIZE=320 limits: only P0+P1 get encrypted SeatCards data.
-  // P2+ fold preflop so showdown only needs P0+P1's ciphertext.
-  // This PROVES the circuit handles N-player shuffle correctly.
+  // HAND 1: ALL N players check through all streets → full showdown
+  // Tests reveal_all_showdown: single MPC call reveals all players.
   // ═══════════════════════════════════════════════════════════════════
 
   console.log(`\n${'─'.repeat(60)}`);
-  console.log(`  HAND 1: ${numPlayers}-player deal, extras fold → HU showdown`);
+  console.log(`  HAND 1: ${numPlayers}-player deal → ALL check → full showdown`);
   console.log(`${'─'.repeat(60)}`);
 
   // Start game
@@ -546,18 +539,16 @@ async function runMultiPlayerTest(conn: Connection, config: TestConfig) {
   if (dealMs < 0) { console.log('\n  ❌ Deal failed'); return false; }
   console.log(`\n  ⏱  shuffle_and_deal (${numPlayers}p): ${(dealMs / 1000).toFixed(1)}s`);
 
-  // Read SeatCards — P0+P1 should have encrypted data, P2+ may be zeroed (SIZE=320 limit)
+  // Read SeatCards — P0+P1 should have Shared encrypted data for client decrypt
   console.log('\n  SeatCards encrypted data check:');
   for (let i = 0; i < numPlayers; i++) {
     const scInfo = await conn.getAccountInfo(getSeatCards(tablePDA, i));
     if (scInfo) {
       const scData = Buffer.from(scInfo.data);
       const enc1 = scData.slice(76, 76 + 32);
-      const nonce = scData.slice(140, 140 + 16);
       const hasData = enc1.some((b: number) => b !== 0);
-      const tag = i < 2 ? (hasData ? '✅' : '❌ EXPECTED NON-ZERO') : (hasData ? '✅ bonus' : '⚠️ zero (expected, SIZE limit)');
+      const tag = i < 2 ? (hasData ? '✅ Shared ct' : '❌ EXPECTED NON-ZERO') : (hasData ? '✅ bonus' : '— no Shared ct (MXE showdown OK)');
       console.log(`    Seat ${i}: enc1=${hasData ? 'non-zero' : 'zero'}  ${tag}`);
-      // Only P0+P1 must have data (within stride-3 window of 320 bytes)
       if (i < 2 && !hasData) {
         console.log(`  ❌ Seat ${i} MUST have encrypted data`);
         return false;
@@ -565,13 +556,9 @@ async function runMultiPlayerTest(conn: Connection, config: TestConfig) {
     }
   }
 
-  // Preflop: P2+ fold, P0+P1 call/check to see flop
+  // Preflop: ALL players call/check (no folds — full showdown test)
   const preS = await getTableState();
   console.log(`\n  Preflop: curPlayer=${preS.curPlayer}, sb=${preS.sb}, bb=${preS.bb}, dealer=${preS.dealer}`);
-
-  // Seats that must fold (no encrypted data for showdown)
-  const mustFoldSeats = new Set<number>();
-  for (let i = 2; i < numPlayers; i++) mustFoldSeats.add(i);
 
   {
     let safety = 0;
@@ -582,10 +569,7 @@ async function runMultiPlayerTest(conn: Connection, config: TestConfig) {
       const cp = st.curPlayer;
       if (cp >= numPlayers) { console.log(`  ❌ curPlayer=${cp} out of range`); return false; }
 
-      if (mustFoldSeats.has(cp)) {
-        if (!await playerAction(cp, 'Fold')) return false;
-      } else if (cp === st.bb) {
-        // BB checks if no raise, otherwise calls
+      if (cp === st.bb) {
         if (!await playerAction(cp, 'Check')) {
           if (!await playerAction(cp, 'Call')) return false;
         }
@@ -605,7 +589,6 @@ async function runMultiPlayerTest(conn: Connection, config: TestConfig) {
     const comm = (await getTableState()).community;
     console.log(`  Board: ${comm.slice(0, 3).map(c => cardName(c)).join(' ')}`);
 
-    // Flop betting: remaining players check
     {
       let safety = 0;
       while (safety < 20) {
@@ -658,20 +641,27 @@ async function runMultiPlayerTest(conn: Connection, config: TestConfig) {
     console.log(`  Phase after River: ${PHASE_NAMES[(await getTableState()).phase]}`);
   }
 
-  // Showdown (only P0+P1 are active — their SeatCards have encrypted data)
+  // Showdown — ALL players active, reveal_all_showdown decrypts everyone
   const showPhase = (await getTableState()).phase;
   if (showPhase === 7) {
     const showMs = await queueShowdownAndWait();
     if (showMs < 0) { console.log('\n  ❌ Showdown reveal failed'); return false; }
-    console.log(`\n  ⏱  reveal_player_cards (showdown): ${(showMs / 1000).toFixed(1)}s`);
+    console.log(`\n  ⏱  reveal_all_showdown (${numPlayers}p): ${(showMs / 1000).toFixed(1)}s`);
 
     const tblData = (await conn.getAccountInfo(tablePDA))!.data;
+    let allValid = true;
     for (let i = 0; i < numPlayers; i++) {
       const c1 = tblData[T_REVEALED_HANDS + i * 2];
       const c2 = tblData[T_REVEALED_HANDS + i * 2 + 1];
-      const folded = mustFoldSeats.has(i);
-      console.log(`  Seat ${i}: ${cardName(c1)} ${cardName(c2)}${folded ? ' (folded)' : ''}`);
+      const valid = c1 < 52 && c2 < 52;
+      console.log(`  Seat ${i}: ${cardName(c1)} ${cardName(c2)}${valid ? '' : ' ❌ INVALID'}`);
+      if (!valid) allValid = false;
     }
+    if (!allValid) {
+      console.log(`  ❌ Not all players have valid revealed cards!`);
+      return false;
+    }
+    console.log(`  ✅ All ${numPlayers} players' cards revealed via single MPC call!`);
   }
 
   // Settle

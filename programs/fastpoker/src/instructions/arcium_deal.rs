@@ -214,9 +214,10 @@ fn queue_deal_cpi(
     num_players: u8,
 ) -> Result<(Pubkey, Pubkey)> {
     // Parse pubkeys + nonces from packed Vec and build MPC args
-    // Single MXE nonce (nonce=0) for packed community card output
+    // Two MXE nonces (both 0): mxe_comm for community u64, mxe_holes for packed u128
     let mut builder = ArgBuilder::new()
-        .plaintext_u128(0u128);  // mxe nonce (packed community u64)
+        .plaintext_u128(0u128)   // mxe_comm nonce (packed community u64)
+        .plaintext_u128(0u128);  // mxe_holes nonce (packed holes u128)
     for i in 0..9 {
         let base = i * 48;
         let mut pubkey = [0u8; 32];

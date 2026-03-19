@@ -29,14 +29,14 @@ pub const COMP_DEF_OFFSET_REVEAL:   u32 = arcium_anchor::comp_def_offset("reveal
 pub const COMP_DEF_OFFSET_SHOWDOWN: u32 = arcium_anchor::comp_def_offset("reveal_all_showdown");
 
 // ── Circuit compiled sizes (from `wc -c build/*.arcis`) ──
-pub const CIRCUIT_LEN_SHUFFLE:  u32 = 12_752_912;
+pub const CIRCUIT_LEN_SHUFFLE:  u32 = 12_804_188;
 pub const CIRCUIT_LEN_REVEAL:   u32 = 142_940;
-pub const CIRCUIT_LEN_SHOWDOWN: u32 = 683_916;
+pub const CIRCUIT_LEN_SHOWDOWN: u32 = 232_722;
 
 // ── Circuit weights (from build/*.weight → "weight" field) ──
-pub const WEIGHT_SHUFFLE:  u64 = 3_375_930_140;
+pub const WEIGHT_SHUFFLE:  u64 = 3_397_767_196;
 pub const WEIGHT_REVEAL:   u64 = 160_781_192;
-pub const WEIGHT_SHOWDOWN: u64 = 432_875_216;
+pub const WEIGHT_SHOWDOWN: u64 = 170_525_492;
 
 // ─────────────────────────────────────────────────────────────
 // InitShuffleCompDef — registers shuffle_and_deal circuit
@@ -79,10 +79,11 @@ impl<'info> InitCompDefAccs<'info> for InitShuffleCompDef<'info> {
     fn lut_program(&self) -> AccountInfo<'info> { self.lut_program.to_account_info() }
     fn system_program(&self) -> AccountInfo<'info> { self.system_program.to_account_info() }
     fn params(&self) -> Vec<Parameter> {
-        // shuffle_and_deal(mxe: Mxe, p0..p8: Shared, num_players: u8)
-        // Mxe = struct{u128} (single nonce). Each Shared = struct{x25519_pubkey, u128}.
+        // shuffle_and_deal(mxe_comm: Mxe, mxe_holes: Mxe, p0..p8: Shared, num_players: u8)
+        // Each Mxe = struct{u128} (nonce). Each Shared = struct{x25519_pubkey, u128}.
         vec![
-            Parameter::PlaintextU128,       // mxe nonce
+            Parameter::PlaintextU128,       // mxe_comm nonce
+            Parameter::PlaintextU128,       // mxe_holes nonce
             Parameter::ArcisX25519Pubkey,   // p0 pubkey
             Parameter::PlaintextU128,       // p0 nonce
             Parameter::ArcisX25519Pubkey,   // p1 pubkey
@@ -246,6 +247,6 @@ impl<'info> InitCompDefAccs<'info> for InitShowdownCompDef<'info> {
 
 pub fn init_showdown_handler(ctx: Context<InitShowdownCompDef>) -> Result<()> {
     init_comp_def(ctx.accounts, None, None)?;
-    msg!("Initialized reveal_showdown comp def (offset={})", COMP_DEF_OFFSET_SHOWDOWN);
+    msg!("Initialized reveal_all_showdown comp def (offset={})", COMP_DEF_OFFSET_SHOWDOWN);
     Ok(())
 }

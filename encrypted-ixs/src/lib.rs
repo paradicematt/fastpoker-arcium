@@ -29,7 +29,8 @@ mod circuits {
     // ========================================================================
     #[instruction]
     pub fn shuffle_and_deal(
-        mxe: Mxe,
+        mxe_comm: Mxe,
+        mxe_holes: Mxe,
         p0: Shared,
         p1: Shared,
         p2: Shared,
@@ -103,11 +104,25 @@ mod circuits {
             if num_players > 8 { deck[17] as u128 } else { nd7 },
         ];
         // Pack: packed = cards[0]*128^17 + cards[1]*128^16 + ... + cards[17]*128^0
-        let mut i = 0;
-        while i < 18 {
-            packed_holes = packed_holes * 128 + cards[i];
-            i += 1;
-        }
+        // Unrolled — Arcis does not support while loops
+        packed_holes = packed_holes * 128 + cards[0];
+        packed_holes = packed_holes * 128 + cards[1];
+        packed_holes = packed_holes * 128 + cards[2];
+        packed_holes = packed_holes * 128 + cards[3];
+        packed_holes = packed_holes * 128 + cards[4];
+        packed_holes = packed_holes * 128 + cards[5];
+        packed_holes = packed_holes * 128 + cards[6];
+        packed_holes = packed_holes * 128 + cards[7];
+        packed_holes = packed_holes * 128 + cards[8];
+        packed_holes = packed_holes * 128 + cards[9];
+        packed_holes = packed_holes * 128 + cards[10];
+        packed_holes = packed_holes * 128 + cards[11];
+        packed_holes = packed_holes * 128 + cards[12];
+        packed_holes = packed_holes * 128 + cards[13];
+        packed_holes = packed_holes * 128 + cards[14];
+        packed_holes = packed_holes * 128 + cards[15];
+        packed_holes = packed_holes * 128 + cards[16];
+        packed_holes = packed_holes * 128 + cards[17];
 
         // Community cards: positions 18-22 (after max 18 hole cards for 9 players)
         let packed_comm: u64 = (deck[18] as u64) * 256 * 256 * 256 * 256
@@ -117,8 +132,8 @@ mod circuits {
                              + (deck[22] as u64);
 
         (
-            mxe.from_arcis(packed_comm),
-            mxe.from_arcis(packed_holes),
+            mxe_comm.from_arcis(packed_comm),
+            mxe_holes.from_arcis(packed_holes),
             p0.from_arcis(p0_pack),
             p1.from_arcis(p1_pack),
             p2.from_arcis(p2_pack),
@@ -184,43 +199,54 @@ mod circuits {
         let packed = packed_holes.to_arcis();
         let not_dealt: u16 = 255 * 256 + 255; // 0xFFFF
 
-        // Unpack 7-bit encoded cards from u128
+        // Unpack 7-bit encoded cards from u128 via repeated div/mod by 128
         // packed = p0c1*128^17 + p0c2*128^16 + ... + p8c2*128^0
-        // Extract card at position i: (packed / 128^(17-i)) % 128
-        // Use division chain to avoid overflow
-        let mut vals: [u128; 18] = [0; 18];
+        // Extract from LSB (p8c2) to MSB (p0c1), unrolled — Arcis has no while loops
         let mut rem = packed;
-        let mut j = 0;
-        while j < 18 {
-            // Extract from most significant (position 0) to least (position 17)
-            // Divide by 128^(17-j) to get the j-th card
-            // Equivalent: shift right by (17-j)*7 bits, mask to 7 bits
-            // But using division for MPC compatibility:
-            let mut divisor: u128 = 1;
-            let mut k = 0;
-            while k < (17 - j) {
-                divisor = divisor * 128;
-                k += 1;
-            }
-            vals[j] = rem / divisor;
-            rem = rem % divisor;
-            j += 1;
-        }
+        let p8c2 = rem % 128; rem = rem / 128;
+        let p8c1 = rem % 128; rem = rem / 128;
+        let p7c2 = rem % 128; rem = rem / 128;
+        let p7c1 = rem % 128; rem = rem / 128;
+        let p6c2 = rem % 128; rem = rem / 128;
+        let p6c1 = rem % 128; rem = rem / 128;
+        let p5c2 = rem % 128; rem = rem / 128;
+        let p5c1 = rem % 128; rem = rem / 128;
+        let p4c2 = rem % 128; rem = rem / 128;
+        let p4c1 = rem % 128; rem = rem / 128;
+        let p3c2 = rem % 128; rem = rem / 128;
+        let p3c1 = rem % 128; rem = rem / 128;
+        let p2c2 = rem % 128; rem = rem / 128;
+        let p2c1 = rem % 128; rem = rem / 128;
+        let p1c2 = rem % 128; rem = rem / 128;
+        let p1c1 = rem % 128; rem = rem / 128;
+        let p0c2 = rem % 128; rem = rem / 128;
+        let p0c1 = rem % 128;
+
+        // Extract active_mask bits via div/mod (Arcis has no bitwise &)
+        let b0: u16 = active_mask % 2;
+        let b1: u16 = (active_mask / 2) % 2;
+        let b2: u16 = (active_mask / 4) % 2;
+        let b3: u16 = (active_mask / 8) % 2;
+        let b4: u16 = (active_mask / 16) % 2;
+        let b5: u16 = (active_mask / 32) % 2;
+        let b6: u16 = (active_mask / 64) % 2;
+        let b7: u16 = (active_mask / 128) % 2;
+        let b8: u16 = (active_mask / 256) % 2;
 
         // Build per-player packed u16 (card1*256+card2), applying active_mask
-        let p0: u16 = if active_mask & 1 != 0 { (vals[0] as u16) * 256 + (vals[1] as u16) } else { not_dealt };
-        let p1: u16 = if active_mask & 2 != 0 { (vals[2] as u16) * 256 + (vals[3] as u16) } else { not_dealt };
-        let p2: u16 = if active_mask & 4 != 0 { (vals[4] as u16) * 256 + (vals[5] as u16) } else { not_dealt };
-        let p3: u16 = if active_mask & 8 != 0 { (vals[6] as u16) * 256 + (vals[7] as u16) } else { not_dealt };
-        let p4: u16 = if active_mask & 16 != 0 { (vals[8] as u16) * 256 + (vals[9] as u16) } else { not_dealt };
-        let p5: u16 = if active_mask & 32 != 0 { (vals[10] as u16) * 256 + (vals[11] as u16) } else { not_dealt };
-        let p6: u16 = if active_mask & 64 != 0 { (vals[12] as u16) * 256 + (vals[13] as u16) } else { not_dealt };
-        let p7: u16 = if active_mask & 128 != 0 { (vals[14] as u16) * 256 + (vals[15] as u16) } else { not_dealt };
-        let p8: u16 = if active_mask & 256 != 0 { (vals[16] as u16) * 256 + (vals[17] as u16) } else { not_dealt };
+        let s0: u16 = if b0 > 0 { (p0c1 as u16) * 256 + (p0c2 as u16) } else { not_dealt };
+        let s1: u16 = if b1 > 0 { (p1c1 as u16) * 256 + (p1c2 as u16) } else { not_dealt };
+        let s2: u16 = if b2 > 0 { (p2c1 as u16) * 256 + (p2c2 as u16) } else { not_dealt };
+        let s3: u16 = if b3 > 0 { (p3c1 as u16) * 256 + (p3c2 as u16) } else { not_dealt };
+        let s4: u16 = if b4 > 0 { (p4c1 as u16) * 256 + (p4c2 as u16) } else { not_dealt };
+        let s5: u16 = if b5 > 0 { (p5c1 as u16) * 256 + (p5c2 as u16) } else { not_dealt };
+        let s6: u16 = if b6 > 0 { (p6c1 as u16) * 256 + (p6c2 as u16) } else { not_dealt };
+        let s7: u16 = if b7 > 0 { (p7c1 as u16) * 256 + (p7c2 as u16) } else { not_dealt };
+        let s8: u16 = if b8 > 0 { (p8c1 as u16) * 256 + (p8c2 as u16) } else { not_dealt };
 
         (
-            p0.reveal(), p1.reveal(), p2.reveal(), p3.reveal(), p4.reveal(),
-            p5.reveal(), p6.reveal(), p7.reveal(), p8.reveal(),
+            s0.reveal(), s1.reveal(), s2.reveal(), s3.reveal(), s4.reveal(),
+            s5.reveal(), s6.reveal(), s7.reveal(), s8.reveal(),
         )
     }
 }
