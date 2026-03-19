@@ -1,0 +1,32 @@
+[
+  {
+    "pubkey": "HGbdSKaX1g2HZJWmxTMzMP4ZncZ2VYkNhh1cxmERR5Ev",
+    "reason": "Confined",
+    "markedAt": 1772553370970
+  },
+  {
+    "pubkey": "EEb2Mj9E1ANLb4Qo8pFFfPHgKRRNQtzEi3HSRQY5Sp35",
+    "reason": "Confined",
+    "markedAt": 1772553459079
+  },
+  {
+    "pubkey": "5mpyRepi8hmp2t14no4YrgDKg6qBmi44C4udba1XtFBU",
+    "reason": "Confined",
+    "markedAt": 1772553482554
+  },
+  {
+    "pubkey": "44wLJB6R7iNCKF3YUUco3PLZMB8NX7nZCoNhhZ6m1dNB",
+    "reason": "Confined",
+    "markedAt": 1772553519977
+  },
+  {
+    "pubkey": "6qu4cpBdEC3v9kuNnuTeoJsSwDSDzFFVhzLWiR7t81Vf",
+    "reason": "Confined",
+    "markedAt": 1772553544525
+  },
+  {
+    "pubkey": "AuCCLzy4yrZSr5rho2NTKQCRYgLNDXgbKXewHig2n4B2",
+    "reason": "WrongValidator",
+    "markedAt": 1772560629265
+  }
+]

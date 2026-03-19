@@ -1,0 +1,100 @@
+{
+  "2BTqYg8khvA528hDJAaRpocYkvR1c8fkusFwbKwQ6DTy": {
+    "pda": "2BTqYg8khvA528hDJAaRpocYkvR1c8fkusFwbKwQ6DTy",
+    "gameType": 2,
+    "maxPlayers": 9,
+    "tier": 0,
+    "createdAt": 1772642675417
+  },
+  "9hPrmwSszzCp6Gcd7geva27Wi2bEdEWviXtDFZ9QfYLR": {
+    "pda": "9hPrmwSszzCp6Gcd7geva27Wi2bEdEWviXtDFZ9QfYLR",
+    "gameType": 1,
+    "maxPlayers": 6,
+    "tier": 0,
+    "createdAt": 1772753433140
+  },
+  "Dyh8Uv1UpGxkFj571MR3HSkY9TaFvdQu6k8iEnMvZbSs": {
+    "pda": "Dyh8Uv1UpGxkFj571MR3HSkY9TaFvdQu6k8iEnMvZbSs",
+    "gameType": 1,
+    "maxPlayers": 6,
+    "tier": 0,
+    "createdAt": 1772753435549
+  },
+  "HkjWB8SHK454DyGjrrJp1obEhQD89k5jM5nxSJWBVvBH": {
+    "pda": "HkjWB8SHK454DyGjrrJp1obEhQD89k5jM5nxSJWBVvBH",
+    "gameType": 0,
+    "maxPlayers": 2,
+    "tier": 0,
+    "createdAt": 1772756188468
+  },
+  "3A6JFZApMXS1FcFnuvHdG46AgNVAtDnkr1FxsJ5bMJXZ": {
+    "pda": "3A6JFZApMXS1FcFnuvHdG46AgNVAtDnkr1FxsJ5bMJXZ",
+    "gameType": 2,
+    "maxPlayers": 9,
+    "tier": 0,
+    "createdAt": 1772756611924
+  },
+  "AUzo5V7duXgdDUt1cmk9vGvHLds462FSkeDBgm2JCPWv": {
+    "pda": "AUzo5V7duXgdDUt1cmk9vGvHLds462FSkeDBgm2JCPWv",
+    "gameType": 2,
+    "maxPlayers": 9,
+    "tier": 0,
+    "createdAt": 1772756616675
+  },
+  "61nYu96gGtAiMGqhjPGouNsooGx1LKpjnTwb3g6yAscN": {
+    "pda": "61nYu96gGtAiMGqhjPGouNsooGx1LKpjnTwb3g6yAscN",
+    "gameType": 0,
+    "maxPlayers": 2,
+    "tier": 0,
+    "createdAt": 1772757009440
+  },
+  "BAHJ7oBQYvDvD34CXcdkpQUq1x5Ug7H3uybLyTwoMAMz": {
+    "pda": "BAHJ7oBQYvDvD34CXcdkpQUq1x5Ug7H3uybLyTwoMAMz",
+    "gameType": 0,
+    "maxPlayers": 2,
+    "tier": 0,
+    "createdAt": 1772757013565
+  },
+  "rugGwZQ2hRAtqExydgRRxmLpRVX49XwDWjrfDdwfBBP": {
+    "pda": "rugGwZQ2hRAtqExydgRRxmLpRVX49XwDWjrfDdwfBBP",
+    "gameType": 0,
+    "maxPlayers": 2,
+    "tier": 0,
+    "createdAt": 1772757420559
+  },
+  "DmHQSpb3JS8K97bPmBb2xk1Xh8ipS9Db8ZAzENu4rn7V": {
+    "pda": "DmHQSpb3JS8K97bPmBb2xk1Xh8ipS9Db8ZAzENu4rn7V",
+    "gameType": 0,
+    "maxPlayers": 2,
+    "tier": 0,
+    "createdAt": 1772757652754
+  },
+  "3hPEj6ATpurax7d8BL8qB8eWd3DiXR3YeW1vFFpCV25G": {
+    "pda": "3hPEj6ATpurax7d8BL8qB8eWd3DiXR3YeW1vFFpCV25G",
+    "gameType": 0,
+    "maxPlayers": 2,
+    "tier": 0,
+    "createdAt": 1772757894198
+  },
+  "ESiJiw2hbjviQAvgpLCkLtv391HMeEqTyy2GYSTb13Nz": {
+    "pda": "ESiJiw2hbjviQAvgpLCkLtv391HMeEqTyy2GYSTb13Nz",
+    "gameType": 0,
+    "maxPlayers": 2,
+    "tier": 0,
+    "createdAt": 1772758562802
+  },
+  "BhWk4LGMgPKuhmZ6uxeMmcHkf3aEZfDw3xPdp5N4KWfc": {
+    "pda": "BhWk4LGMgPKuhmZ6uxeMmcHkf3aEZfDw3xPdp5N4KWfc",
+    "gameType": 0,
+    "maxPlayers": 2,
+    "tier": 0,
+    "createdAt": 1772769371502
+  },
+  "4iPEnigatsfKhiSvgMrTnzWt1iR4KV96s9VpChced79u": {
+    "pda": "4iPEnigatsfKhiSvgMrTnzWt1iR4KV96s9VpChced79u",
+    "gameType": 0,
+    "maxPlayers": 2,
+    "tier": 0,
+    "createdAt": 1772769387644
+  }
+}

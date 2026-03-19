@@ -1,0 +1,83 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+.next/
+target/
+dist/
+build/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Keys / Keypairs - NEVER commit private keys
+*keypair*.json
+*-keypair.json
+*wallet*.json
+tests/keys/*.json
+!tests/keys/.gitkeep
+contracts/auth/**/*.json
+
+# Rust/Solana build artifacts
+contracts/target/
+contracts/Cargo.lock
+
+# Temp files
+*.tmp
+*.bak
+
+# Test artifacts
+tests/test-output.txt
+tests/active-game.json
+tests/browser-game.json
+tests/cli-game.json
+
+# Solana local validator
+test-ledger/
+
+# MagicBlock local test storage
+magicblock-test-storage/
+
+# Anchor
+.anchor/
+programs/cq-poker/target/
+
+# MagicBlock example repos (reference only, not part of our codebase)
+test-rps-example/
+
+# Crank config (contains API keys)
+backend/crank-config.json
+
+# Localnet keypairs (copied from WSL)
+backend/.localnet-keypair.json
+scripts/localnet-keypair.json
+
+# Build logs
+build-output.txt
+circuit-build*.log
+localnet-start.log
+
+# Arcium localnet artifacts (generated)
+artifacts/
+
+# Large compiled circuit files
+build/*.arcis
+
+# Lock files (regenerated)
+package-lock.json
+Cargo.lock

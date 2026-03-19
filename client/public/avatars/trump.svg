@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFD700"/>
+      <stop offset="100%" stop-color="#B8860B"/>
+    </linearGradient>
+  </defs>
+  <circle cx="50" cy="50" r="50" fill="url(#bg)"/>
+  <circle cx="50" cy="50" r="42" fill="none" stroke="#FFF8" stroke-width="2"/>
+  <!-- Hair silhouette -->
+  <path d="M28,38 C28,24 36,18 50,16 C64,18 72,24 72,38 C74,32 76,28 74,22 C70,14 58,10 50,10 C42,10 30,14 26,22 C24,28 26,32 28,38Z" fill="#C8A200"/>
+  <!-- Face -->
+  <ellipse cx="50" cy="50" rx="22" ry="24" fill="#FFB366"/>
+  <!-- Eyes -->
+  <ellipse cx="42" cy="46" rx="3" ry="2.5" fill="white"/>
+  <ellipse cx="58" cy="46" rx="3" ry="2.5" fill="white"/>
+  <circle cx="42" cy="46" r="1.8" fill="#2563EB"/>
+  <circle cx="58" cy="46" r="1.8" fill="#2563EB"/>
+  <!-- Mouth (slight smirk) -->
+  <path d="M40,60 Q50,66 60,60" fill="none" stroke="#A0522D" stroke-width="1.5" stroke-linecap="round"/>
+  <!-- TRUMP text -->
+  <text x="50" y="88" text-anchor="middle" font-family="Arial Black,sans-serif" font-weight="900" font-size="14" fill="white" stroke="#B8860B" stroke-width="0.5">TRUMP</text>
+</svg>

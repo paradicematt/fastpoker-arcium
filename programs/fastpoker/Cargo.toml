@@ -1,0 +1,38 @@
+[package]
+name = "fastpoker"
+version = "0.1.0"
+description = "Fast Poker - On-chain Texas Hold'em with Arcium MPC Privacy"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "fastpoker"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+anchor-debug = []
+custom-heap = []
+custom-panic = []
+
+[dependencies]
+anchor-lang = { version = "0.32.1", features = ["init-if-needed"] }
+anchor-spl = "0.32.1"
+# Arcium SDK for on-chain MPC integration (queue_computation, callbacks)
+arcium-client = { default-features = false, version = "=0.8.5" }
+arcium-macros = "=0.8.5"
+arcium-anchor = "=0.8.5"
+bincode = "1.3"
+borsh = "0.10.3"
+# indexmap >= 2.7.1 required by Arcium arcis compiler
+indexmap = "2.7.1"
+
+[dev-dependencies]
+# anchor-client = "0.30.1"  # Disabled - pulls in incompatible deps
+
+# Note: base64ct and constant_time_eq pinned in [dependencies] to avoid edition2024
+# Remove pins once Solana ships Cargo 1.85+

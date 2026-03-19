@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#4FC3F7"/>
+      <stop offset="100%" stop-color="#1565C0"/>
+    </linearGradient>
+  </defs>
+  <circle cx="50" cy="50" r="50" fill="url(#bg)"/>
+  <!-- Body -->
+  <ellipse cx="50" cy="58" rx="28" ry="32" fill="#2C3E50"/>
+  <!-- Belly -->
+  <ellipse cx="50" cy="62" rx="18" ry="22" fill="#ECF0F1"/>
+  <!-- Head -->
+  <circle cx="50" cy="32" r="22" fill="#2C3E50"/>
+  <!-- Face patch -->
+  <ellipse cx="50" cy="36" rx="16" ry="14" fill="#ECF0F1"/>
+  <!-- Eyes -->
+  <ellipse cx="42" cy="32" rx="5" ry="5.5" fill="white"/>
+  <ellipse cx="58" cy="32" rx="5" ry="5.5" fill="white"/>
+  <circle cx="43" cy="32" r="3.5" fill="#1a1a1a"/>
+  <circle cx="59" cy="32" r="3.5" fill="#1a1a1a"/>
+  <circle cx="44" cy="31" r="1.2" fill="white"/>
+  <circle cx="60" cy="31" r="1.2" fill="white"/>
+  <!-- Beak -->
+  <ellipse cx="50" cy="40" rx="6" ry="3.5" fill="#F39C12"/>
+  <!-- Flippers -->
+  <ellipse cx="22" cy="55" rx="8" ry="16" fill="#2C3E50" transform="rotate(-15,22,55)"/>
+  <ellipse cx="78" cy="55" rx="8" ry="16" fill="#2C3E50" transform="rotate(15,78,55)"/>
+  <!-- Feet -->
+  <ellipse cx="40" cy="90" rx="8" ry="4" fill="#F39C12"/>
+  <ellipse cx="60" cy="90" rx="8" ry="4" fill="#F39C12"/>
+  <!-- Beanie hat -->
+  <path d="M30,28 Q30,14 50,12 Q70,14 70,28" fill="#E74C3C"/>
+  <rect x="28" y="26" width="44" height="5" rx="2" fill="#C0392B"/>
+  <circle cx="50" cy="10" r="4" fill="#E74C3C"/>
+</svg>

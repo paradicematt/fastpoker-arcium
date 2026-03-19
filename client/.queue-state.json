@@ -1,0 +1,32 @@
+{
+  "heads-up-1773177430933": {
+    "id": "heads-up-1773177430933",
+    "type": "heads_up",
+    "maxPlayers": 2,
+    "buyIn": 0.01,
+    "tier": 0,
+    "status": "waiting",
+    "players": [],
+    "createdAt": 1773177430933
+  },
+  "6max-1773177430933": {
+    "id": "6max-1773177430933",
+    "type": "6max",
+    "maxPlayers": 6,
+    "buyIn": 0.01,
+    "tier": 0,
+    "status": "waiting",
+    "players": [],
+    "createdAt": 1773177430933
+  },
+  "9max-1773177430933": {
+    "id": "9max-1773177430933",
+    "type": "9max",
+    "maxPlayers": 9,
+    "buyIn": 0.01,
+    "tier": 0,
+    "status": "waiting",
+    "players": [],
+    "createdAt": 1773177430933
+  }
+}

@@ -1,0 +1,12 @@
+[package]
+name = "poker-api"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+bytemuck.workspace = true
+num_enum.workspace = true
+solana-program.workspace = true
+steel.workspace = true
+thiserror.workspace = true
+spl-token.workspace = true

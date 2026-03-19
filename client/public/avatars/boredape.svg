@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#D4A574"/>
+      <stop offset="100%" stop-color="#8B6914"/>
+    </linearGradient>
+  </defs>
+  <circle cx="50" cy="50" r="50" fill="url(#bg)"/>
+  <!-- Fur body -->
+  <ellipse cx="50" cy="60" rx="32" ry="30" fill="#8B6914"/>
+  <!-- Head shape -->
+  <ellipse cx="50" cy="42" rx="28" ry="26" fill="#C4923A"/>
+  <!-- Brow ridge -->
+  <path d="M25,36 Q35,28 50,30 Q65,28 75,36" fill="#A07828" stroke="#8B6914" stroke-width="1"/>
+  <!-- Eyes (bored/droopy look) -->
+  <ellipse cx="38" cy="40" rx="8" ry="6" fill="white"/>
+  <ellipse cx="62" cy="40" rx="8" ry="6" fill="white"/>
+  <!-- Droopy eyelids (bored look) -->
+  <path d="M30,38 Q38,34 46,38" fill="#A07828"/>
+  <path d="M54,38 Q62,34 70,38" fill="#A07828"/>
+  <!-- Pupils -->
+  <circle cx="39" cy="41" r="3.5" fill="#1a1a1a"/>
+  <circle cx="63" cy="41" r="3.5" fill="#1a1a1a"/>
+  <circle cx="40" cy="40" r="1" fill="white"/>
+  <circle cx="64" cy="40" r="1" fill="white"/>
+  <!-- Nose -->
+  <ellipse cx="50" cy="50" rx="10" ry="6" fill="#8B5E14"/>
+  <circle cx="46" cy="50" r="2.5" fill="#5C3D0E"/>
+  <circle cx="54" cy="50" r="2.5" fill="#5C3D0E"/>
+  <!-- Mouth (bored/flat) -->
+  <path d="M36,58 Q43,62 50,60 Q57,62 64,58" fill="none" stroke="#5C3D0E" stroke-width="2" stroke-linecap="round"/>
+  <!-- Teeth showing -->
+  <rect x="44" y="58" width="4" height="3" rx="1" fill="white"/>
+  <rect x="52" y="58" width="4" height="3" rx="1" fill="white"/>
+  <!-- Ears -->
+  <ellipse cx="24" cy="34" rx="6" ry="8" fill="#C4923A"/>
+  <ellipse cx="24" cy="34" rx="3.5" ry="5" fill="#E8C494"/>
+  <ellipse cx="76" cy="34" rx="6" ry="8" fill="#C4923A"/>
+  <ellipse cx="76" cy="34" rx="3.5" ry="5" fill="#E8C494"/>
+  <!-- Sailor hat -->
+  <path d="M26,30 Q50,16 74,30" fill="white"/>
+  <rect x="26" y="28" width="48" height="5" rx="1" fill="white"/>
+  <rect x="28" y="30" width="44" height="3" rx="1" fill="#1a4d8c"/>
+</svg>

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <circle cx="64" cy="64" r="64" fill="#0a1628"/>
+  <defs>
+    <linearGradient id="poker-grad" x1="20" y1="108" x2="108" y2="20" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#06b6d4"/>
+      <stop offset="1" stop-color="#10b981"/>
+    </linearGradient>
+  </defs>
+  <!-- Spade symbol -->
+  <g transform="translate(64, 58) scale(1.8)">
+    <path d="M0-22C-4-22-16-10-16 0c0 8 5 13 11 14C-7 15-9 20-12 22h24c-3-2-5-7-7-8c6-1 11-6 11-14C16-10 4-22 0-22z" fill="url(#poker-grad)"/>
+    <rect x="-2" y="18" width="4" height="8" rx="1" fill="url(#poker-grad)"/>
+  </g>
+  <!-- P letter -->
+  <text x="64" y="100" text-anchor="middle" font-family="Arial,sans-serif" font-weight="bold" font-size="18" fill="#06b6d4" opacity="0.6">POKER</text>
+</svg>

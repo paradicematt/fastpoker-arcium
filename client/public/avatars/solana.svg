@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1a1a2e"/>
+      <stop offset="100%" stop-color="#0f0f1a"/>
+    </linearGradient>
+    <linearGradient id="sol1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#00FFA3"/>
+      <stop offset="100%" stop-color="#DC1FFF"/>
+    </linearGradient>
+    <linearGradient id="sol2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#00FFA3"/>
+      <stop offset="100%" stop-color="#DC1FFF"/>
+    </linearGradient>
+    <linearGradient id="sol3" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#00FFA3"/>
+      <stop offset="100%" stop-color="#DC1FFF"/>
+    </linearGradient>
+    <clipPath id="clip"><circle cx="50" cy="50" r="50"/></clipPath>
+  </defs>
+  <circle cx="50" cy="50" r="50" fill="url(#bg)"/>
+  <g clip-path="url(#clip)" transform="translate(15,18) scale(0.175)">
+    <path fill="url(#sol1)" d="M64.6,237.9c2.4-2.4,5.7-3.8,9.2-3.8h317.4c5.8,0,8.7,7,4.6,11.1l-62.7,62.7c-2.4,2.4-5.7,3.8-9.2,3.8H6.5c-5.8,0-8.7-7-4.6-11.1L64.6,237.9z"/>
+    <path fill="url(#sol2)" d="M64.6,3.8C67.1,1.4,70.4,0,73.8,0h317.4c5.8,0,8.7,7,4.6,11.1l-62.7,62.7c-2.4,2.4-5.7,3.8-9.2,3.8H6.5c-5.8,0-8.7-7-4.6-11.1L64.6,3.8z"/>
+    <path fill="url(#sol3)" d="M333.1,120.1c-2.4-2.4-5.7-3.8-9.2-3.8H6.5c-5.8,0-8.7,7-4.6,11.1l62.7,62.7c2.4,2.4,5.7,3.8,9.2,3.8h317.4c5.8,0,8.7-7,4.6-11.1L333.1,120.1z"/>
+  </g>
+</svg>

@@ -1,0 +1,25 @@
+{
+  "name": "cq-poker-tests",
+  "version": "1.0.0",
+  "description": "CQ Poker Anchor Program Tests",
+  "scripts": {
+    "test": "npx ts-node simple-test.ts",
+    "test:poker": "npx ts-node poker-test.ts",
+    "test:magicblock": "npx ts-node magicblock-test.ts",
+    "test:full": "npx ts-node simple-test.ts && npx ts-node poker-test.ts"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "0.29.0",
+    "@magicblock-labs/ephemeral-rollups-sdk": "^0.8.4",
+    "@solana/web3.js": "^1.91.0"
+  },
+  "devDependencies": {
+    "@types/chai": "^4.3.11",
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^20.11.0",
+    "chai": "^4.3.10",
+    "mocha": "^10.2.0",
+    "ts-mocha": "^10.0.0",
+    "typescript": "^5.3.3"
+  }
+}

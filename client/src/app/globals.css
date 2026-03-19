@@ -1,0 +1,147 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 20% 4%;
+    --foreground: 210 40% 95%;
+    --card: 220 18% 7%;
+    --card-foreground: 210 40% 95%;
+    --popover: 220 18% 7%;
+    --popover-foreground: 210 40% 95%;
+    --primary: 174 72% 56%;
+    --primary-foreground: 220 20% 4%;
+    --secondary: 220 14% 12%;
+    --secondary-foreground: 210 40% 95%;
+    --muted: 220 14% 12%;
+    --muted-foreground: 215 16% 50%;
+    --accent: 160 84% 39%;
+    --accent-foreground: 220 20% 4%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 220 14% 14%;
+    --input: 220 14% 10%;
+    --ring: 174 72% 56%;
+    --radius: 0.75rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    background-image: 
+      radial-gradient(ellipse at 20% 50%, rgba(6, 182, 212, 0.03) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 20%, rgba(16, 185, 129, 0.03) 0%, transparent 50%);
+  }
+}
+
+/* ─── Glass / Frosted panels ─── */
+.glass {
+  @apply bg-white/[0.03] backdrop-blur-xl border border-white/[0.06];
+}
+.glass-card {
+  @apply bg-white/[0.04] backdrop-blur-lg border border-white/[0.08] rounded-2xl;
+}
+
+/* ─── Poker table ─── */
+.poker-table-gradient {
+  background: radial-gradient(ellipse at center, #0c3a20 0%, #071f12 60%, #030d07 100%);
+  box-shadow: 
+    inset 0 0 80px rgba(16, 185, 129, 0.06),
+    0 0 60px rgba(0, 0, 0, 0.5);
+}
+
+/* ─── Card shadows ─── */
+.card-shadow {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4), 0 0 1px rgba(255,255,255,0.1);
+}
+.card-shadow-hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5), 0 0 2px rgba(255,255,255,0.15);
+}
+
+/* ─── Neon glow utilities ─── */
+.glow-cyan { box-shadow: 0 0 20px rgba(6, 182, 212, 0.4), 0 0 60px rgba(6, 182, 212, 0.1); }
+.glow-emerald { box-shadow: 0 0 20px rgba(16, 185, 129, 0.4), 0 0 60px rgba(16, 185, 129, 0.1); }
+.glow-red { box-shadow: 0 0 20px rgba(239, 68, 68, 0.4), 0 0 60px rgba(239, 68, 68, 0.1); }
+.glow-amber { box-shadow: 0 0 20px rgba(245, 158, 11, 0.4), 0 0 60px rgba(245, 158, 11, 0.1); }
+.glow-purple { box-shadow: 0 0 20px rgba(168, 85, 247, 0.4), 0 0 60px rgba(168, 85, 247, 0.1); }
+
+/* ─── Neon text ─── */
+.text-glow-cyan { text-shadow: 0 0 10px rgba(6, 182, 212, 0.6), 0 0 40px rgba(6, 182, 212, 0.2); }
+.text-glow-emerald { text-shadow: 0 0 10px rgba(16, 185, 129, 0.6), 0 0 40px rgba(16, 185, 129, 0.2); }
+.text-glow-amber { text-shadow: 0 0 10px rgba(245, 158, 11, 0.6), 0 0 40px rgba(245, 158, 11, 0.2); }
+
+/* ─── Chip stack styling ─── */
+.chip {
+  @apply w-8 h-8 rounded-full border-2 border-dashed flex items-center justify-center font-bold text-xs;
+}
+.chip-white { @apply bg-gray-100 border-gray-300 text-gray-900; }
+.chip-red { @apply bg-red-600 border-red-400 text-white; }
+.chip-blue { @apply bg-blue-600 border-blue-400 text-white; }
+.chip-green { @apply bg-emerald-600 border-emerald-400 text-white; }
+.chip-black { @apply bg-gray-800 border-gray-600 text-white; }
+
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.15); }
+
+/* ─── Showdown animations ─── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes cardReveal {
+  0% { opacity: 0; transform: rotateY(90deg) scale(0.8); }
+  50% { opacity: 1; transform: rotateY(0deg) scale(1.08); }
+  100% { opacity: 1; transform: rotateY(0deg) scale(1); }
+}
+@keyframes winnerPulse {
+  0%, 100% { box-shadow: 0 0 20px rgba(245, 158, 11, 0.3), 0 0 60px rgba(245, 158, 11, 0.1); }
+  50% { box-shadow: 0 0 30px rgba(245, 158, 11, 0.6), 0 0 80px rgba(245, 158, 11, 0.2); }
+}
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes bounceOnce {
+  0% { transform: scale(0.8) translateY(10px); opacity: 0; }
+  50% { transform: scale(1.05) translateY(-4px); opacity: 1; }
+  70% { transform: scale(0.98) translateY(1px); }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+.animate-fadeInUp { animation: fadeInUp 0.6s ease-out both; }
+.animate-fadeIn { animation: fadeIn 0.5s ease-out both; }
+.animate-cardReveal { animation: cardReveal 0.6s ease-out both; }
+.animate-winnerPulse { animation: winnerPulse 2s ease-in-out infinite; }
+.animate-bounce-once { animation: bounceOnce 0.7s ease-out both; }
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent 0%, rgba(245,158,11,0.15) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmer 2s linear infinite;
+}
+
+/* ─── Wallet adapter overrides ─── */
+.wallet-adapter-button {
+  background: rgba(6, 182, 212, 0.1) !important;
+  border: 1px solid rgba(6, 182, 212, 0.3) !important;
+  border-radius: 12px !important;
+  font-family: inherit !important;
+  font-size: 13px !important;
+  height: 40px !important;
+}
+.wallet-adapter-button:hover {
+  background: rgba(6, 182, 212, 0.2) !important;
+}
+.wallet-adapter-button-trigger {
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.15), rgba(16, 185, 129, 0.15)) !important;
+}

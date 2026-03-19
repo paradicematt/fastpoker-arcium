@@ -1,0 +1,22 @@
+{
+  "2KskcmUNXDoL2nD1T7DcgVYmxUYUtTyP4RTmPcJRc9xP": {
+    "wallet": "2KskcmUNXDoL2nD1T7DcgVYmxUYUtTyP4RTmPcJRc9xP",
+    "gamesPlayed": 0,
+    "handsWon": 0,
+    "totalWinnings": 0,
+    "createdAt": "2026-02-12T01:27:15.883Z",
+    "username": "Matt",
+    "avatarUrl": "rocket",
+    "updatedAt": "2026-02-12T01:27:15.883Z"
+  },
+  "8bigAdycKDvD7EHVdyoXumM5pSK4vnXHF5ZJfBe1oTQG": {
+    "wallet": "8bigAdycKDvD7EHVdyoXumM5pSK4vnXHF5ZJfBe1oTQG",
+    "gamesPlayed": 0,
+    "handsWon": 0,
+    "totalWinnings": 0,
+    "createdAt": "2026-02-14T06:45:44.983Z",
+    "username": "Matt",
+    "avatarUrl": "bolt",
+    "updatedAt": "2026-02-14T06:45:44.983Z"
+  }
+}

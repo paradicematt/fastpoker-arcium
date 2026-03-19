@@ -1,0 +1,37 @@
+[toolchain]
+anchor_version = "0.32.1"
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.devnet]
+fastpoker = "4MLbuVZzXpzWcaZaqxHDkm5JuigZzovsVd6VPNDXnyiB"
+
+[programs.localnet]
+fastpoker = "BGyLYzzS5tPASGSj6BbzpLbHVwm4Csg9C1QfD8KGDe3N"
+
+[registry]
+url = "https://api.apr.dev"
+
+[provider]
+cluster = "localnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+
+[test]
+startup_wait = 60000
+shutdown_wait = 2000
+upgradeable = false
+
+[[test.genesis]]
+address = "9qHC57uFi6wz8iit1HwVq3yms81Hn4rgwtE73rh3hZY6"
+program = "contracts/target/deploy/poker_program.so"
+
+[test.validator]
+bind_address = "0.0.0.0"
+url = "http://127.0.0.1:8899"
+ledger = ".anchor/test-ledger"
+rpc_port = 8899
