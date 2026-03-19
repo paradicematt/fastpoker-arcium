@@ -130,17 +130,30 @@ async function main() {
       const rawCircuit = fs.readFileSync(arcisPath);
       console.log(`  Circuit size: ${rawCircuit.length} bytes`);
 
-      try {
-        const sigs = await uploadCircuit(
-          provider,
-          circuit.name,
-          PROGRAM_ID,
-          rawCircuit,
-          true,  // logging
-        );
-        console.log(`  Upload complete! ${sigs.length} transaction(s)`);
-      } catch (e: any) {
-        console.error(`  Upload failed: ${e.message?.slice(0, 200)}`);
+      const MAX_UPLOAD_RETRIES = 5;
+      let uploadSuccess = false;
+      for (let attempt = 1; attempt <= MAX_UPLOAD_RETRIES; attempt++) {
+        try {
+          const sigs = await uploadCircuit(
+            provider,
+            circuit.name,
+            PROGRAM_ID,
+            rawCircuit,
+            true,  // logging
+          );
+          console.log(`  Upload complete! ${sigs.length} transaction(s)`);
+          uploadSuccess = true;
+          break;
+        } catch (e: any) {
+          console.error(`  Upload attempt ${attempt}/${MAX_UPLOAD_RETRIES} failed: ${e.message?.slice(0, 200)}`);
+          if (attempt < MAX_UPLOAD_RETRIES) {
+            console.log(`  Retrying upload in 5s...`);
+            await new Promise(r => setTimeout(r, 5000));
+          }
+        }
+      }
+      if (!uploadSuccess) {
+        console.error(`  ❌ Upload FAILED after ${MAX_UPLOAD_RETRIES} attempts — circuit bytecode may be incomplete!`);
       }
     }
 

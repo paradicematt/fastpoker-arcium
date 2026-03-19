@@ -15,6 +15,7 @@
 import {
   Connection, Keypair, PublicKey, Transaction, TransactionInstruction,
   SystemProgram, sendAndConfirmTransaction, LAMPORTS_PER_SOL,
+  ComputeBudgetProgram,
 } from '@solana/web3.js';
 import * as crypto from 'crypto';
 import {
@@ -317,7 +318,19 @@ async function runMultiPlayerTest(conn: Connection, config: TestConfig) {
     ];
     for (let i = 0; i < s.maxP; i++) if (s.occ & (1 << i)) keys.push({ pubkey: getSeat(tablePDA, i), isSigner: false, isWritable: true });
     for (let i = 0; i < s.maxP; i++) if (s.occ & (1 << i)) keys.push({ pubkey: getSeatCards(tablePDA, i), isSigner: false, isWritable: true });
-    return send(conn, new TransactionInstruction({ programId: PROGRAM_ID, keys, data: IX.settle_hand }), [crank], 'settle_hand');
+    const settleIx = new TransactionInstruction({ programId: PROGRAM_ID, keys, data: IX.settle_hand });
+    try {
+      const tx = new Transaction()
+        .add(ComputeBudgetProgram.setComputeUnitLimit({ units: 800_000 }))
+        .add(settleIx);
+      const sig = await sendAndConfirmTransaction(conn, tx, [crank], { commitment: 'confirmed', skipPreflight: true });
+      console.log(`  \u2705 settle_hand: ${sig.slice(0, 20)}...`);
+      return true;
+    } catch (e: any) {
+      console.log(`  \u274C settle_hand: ${e.message?.slice(0, 200)}`);
+      if (e.logs) e.logs.slice(-5).forEach((l: string) => console.log(`     ${l}`));
+      return false;
+    }
   }
 
   /** Queue arcium_deal and wait for callback → Preflop. */
@@ -547,7 +560,7 @@ async function runMultiPlayerTest(conn: Connection, config: TestConfig) {
       const scData = Buffer.from(scInfo.data);
       const enc1 = scData.slice(76, 76 + 32);
       const hasData = enc1.some((b: number) => b !== 0);
-      const tag = i < 2 ? (hasData ? '✅ Shared ct' : '❌ EXPECTED NON-ZERO') : (hasData ? '✅ bonus' : '— no Shared ct (MXE showdown OK)');
+      const tag = i < 2 ? (hasData ? '✅ Shared ct' : '❌ EXPECTED NON-ZERO') : (hasData ? '✅ bonus Shared ct' : '— no Shared ct (MXE showdown OK)');
       console.log(`    Seat ${i}: enc1=${hasData ? 'non-zero' : 'zero'}  ${tag}`);
       if (i < 2 && !hasData) {
         console.log(`  ❌ Seat ${i} MUST have encrypted data`);

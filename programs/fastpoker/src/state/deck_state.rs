@@ -31,10 +31,10 @@ pub struct DeckState {
     /// Hole card data (12 × 32 bytes = 384 bytes)
     /// Layout:
     ///   [0..8]  = player x25519 pubkeys (written by arcium_deal, used for per-player Shared context)
-    ///   [9]     = MXE packed_holes nonce (32 bytes, stride-3 slot 0)
-    ///   [10]    = MXE packed_holes ct1   (32 bytes, stride-3 slot 1 — the encrypted u128)
-    ///   [11]    = MXE packed_holes ct2   (32 bytes, stride-3 slot 2 — unused Rescue block)
-    /// Written by shuffle_and_deal callback, [9..11] read by reveal_all_showdown
+    ///   [9]     = MXE packed_holes nonce (32 bytes)
+    ///   [10]    = MXE packed_holes ct1   (32 bytes — Pack<[u8;18]> ciphertext)
+    ///   [11]    = reserved (ct2 from stride-3)
+    /// Written by shuffle_and_deal callback, [9..10] read by reveal_all_showdown
     pub encrypted_hole_cards: [[u8; 32]; 12],
     /// Nonces for community card decryption (5 × 16 bytes = 80 bytes)
     pub community_nonces: [[u8; 16]; 5],

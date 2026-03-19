@@ -10,7 +10,7 @@ use crate::state::*;
 use crate::errors::PokerError;
 use crate::constants::*;
 use crate::instructions::init_comp_defs::COMP_DEF_OFFSET_SHOWDOWN;
-use crate::instructions::arcium_deal_callback::validate_arcium_callback_context;
+use crate::instructions::arcium_deal_callback::extract_mpc_output;
 use crate::ID as PROGRAM_ID;
 
 /// Showdown reveal — callback from Arcium MPC reveal_all_showdown circuit.
@@ -79,21 +79,14 @@ pub fn reveal_showdown_callback_handler(
     ctx: Context<RevealShowdownCallback>,
     output: SignedComputationOutputs<RevealShowdownOutput>,
 ) -> Result<()> {
-    // Validate caller: preceding IX must be Arcium's callbackComputation (threat A11)
-    validate_arcium_callback_context(
+    // Extract raw bytes with BLS verification (production) or CPI-only (localnet skip-bls).
+    let raw_bytes = extract_mpc_output(
+        output,
+        &ctx.accounts.cluster_account,
+        &ctx.accounts.computation_account,
         &ctx.accounts.instructions_sysvar,
         &ctx.accounts.arcium_program.key(),
     )?;
-
-    // Extract raw bytes from MPC output
-    let raw_bytes = match output {
-        SignedComputationOutputs::Success(bytes, _sig) => bytes,
-        SignedComputationOutputs::Failure => {
-            msg!("MPC reveal_all_showdown failed (Failure variant)");
-            return Err(PokerError::ArciumComputationTimeout.into());
-        }
-        _ => return Err(PokerError::ArciumCallbackInvalid.into()),
-    };
 
     msg!("reveal_all_showdown MPC SUCCESS: {} bytes (expected 18)", raw_bytes.len());
     require!(raw_bytes.len() >= 18, PokerError::ArciumCallbackInvalid);

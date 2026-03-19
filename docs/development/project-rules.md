@@ -19,15 +19,14 @@ trigger: always_on
 
 ### 2. Card Privacy via Arcium MPC — Cryptographic, Not Access-Control
 
-- **SeatCards store Rescue-cipher encrypted hole cards.** Each player's cards encrypted to their unique x25519 public key via `Enc<Shared, u8>` in the MPC circuit. Anyone can read the account — they get ciphertext they cannot decrypt.
-- **DeckState stores MXE-encrypted community cards.** Encrypted to `Enc<Mxe, u8>` — nobody (not even players) can read until a reveal MPC callback writes plaintext.
+- **SeatCards store Rescue-cipher encrypted hole cards.** Each player's cards encrypted to their unique x25519 public key via `Enc<Shared, u16>` (packed pair) in the MPC circuit. Anyone can read the account — they get ciphertext they cannot decrypt.
+- **DeckState stores MXE-encrypted ALL cards (community + holes) in a single Pack<[u8; 23]>.** Both `reveal_community` and `reveal_all_showdown` decrypt the same MXE ciphertext.
 - **No Permission Program.** TEE Permission PDAs are eliminated entirely. Privacy comes from cryptography, not RPC access control.
 - **Player x25519 pubkey stored in `PlayerSeat.x25519_pubkey`.** Provided during `seat_player`, derived deterministically from wallet signature on the frontend.
 - **Folded players' cards stay encrypted forever.** No reveal path for folded hands.
-- **Community cards revealed via small MPC calls** at flop/turn/river. Each reveal decrypts the relevant cards and writes plaintext to `Table.community_cards`.
-- **Showdown reveals active hands via MPC callback.** Plaintext written to `SeatCards.card1/card2` for non-folded players only. Then `settle_hand` runs unchanged.
+- **Community cards revealed via small MPC calls** at flop/turn/river. Each reveal decrypts community indices from the Pack<[u8;23]> and writes plaintext to `Table.community_cards`.
+- **Showdown reveals ALL active hands in a single MPC call.** `reveal_all_showdown` decrypts hole card indices from the same Pack, returns 9 packed u16 values. Callback writes plaintext to `SeatCards.card1/card2` for non-folded players. Then `settle_hand` evaluates.
 - **NEVER log or `msg!` card values, encrypted or plaintext.** No `#[cfg(test)]` code that exposes card values.
-- **Community cards 2-5 use `Shared` encryption** (not `Mxe`) due to Arcis limitation — `Shared::new(pX_key)` workaround. See threat model A12.
 
 ### 3. Session Keys (gum-sdk) — 1-Click Gameplay on L1
 
@@ -179,11 +178,24 @@ trigger: always_on
 
 **Wrong SIZE → Anchor error 102 (InstructionDidNotDeserialize).** This is the #1 callback failure cause.
 
-### Packed Hole Card Format (10 encrypted values, SIZE=320)
+### Single-MXE Pack<[u8;23]> Architecture (Verified 2026-03-19)
+
+**CRITICAL BUG: Arcium multi-MXE output corruption.** When a circuit produces 2+ MXE ciphertext outputs, the 2nd+ MXE output is silently corrupted. The first MXE output always works. This was confirmed with u128, 2×u64, and Pack<[u8;18]> — all corrupted when used as the 2nd MXE output.
+
+**Solution:** Pack ALL 23 cards (5 community + 18 hole) into a **single** `Enc<Mxe, Pack<[u8;23]>>` output. Both `reveal_community` and `reveal_all_showdown` decrypt the exact same ciphertext — community uses indices [0..4], holes uses [5..22].
+
+- **Pack layout:** `[comm1..comm5, p0c1, p0c2, p1c1, p1c2, ..., p8c1, p8c2]`
 - **2 hole cards packed per player into `Enc<Shared, u16>`**: `card1 * 256 + card2`
-- **Encrypted values:** 1 Enc<Mxe,u64> packed community + 9 Enc<Shared,u16> packed hole cards = **10 encrypted values**
+- **Encrypted values:** 1 Enc<Mxe, Pack<[u8;23]>> all-cards + 9 Enc<Shared,u16> packed hole cards = **10 encrypted values**
 - **`Output::Ciphertext` count = 10** (matches encrypted values, NOT raw slots)
-- **Client unpacks:** `card1 = u16 >> 8`, `card2 = u16 & 0xFF`
+- **Client unpacks (Shared):** `card1 = u16 >> 8`, `card2 = u16 & 0xFF`
+- **DeckState stores same nonce+ct1 in both `encrypted_community[0..1]` and `encrypted_hole_cards[9..10]`.**
+
+### Arcis Pack<T> Compiler Quirks
+- **`Pack::new()` fails with `[{integer}; N]` type error** if array is initialized with literals or conditionals.
+- **Must use `[0u8; N]`** (explicit u8 suffix) and then assign elements individually ("Blackjack pattern").
+- **Conditionals inside Pack arrays fail** — even with explicit type annotations. Use `active_mask` in the reveal circuit instead of sentinels in the Pack.
+- **Pack<[u8; 23]> = 1 field element** (23/26 bytes capacity). No multi-element packing overhead.
 
 ### MPC Raw Output Format — Ciphertext Outputs Use Stride=3 (Verified 2026-03-14)
 Each `Enc<T, V>` **ciphertext** output produces a **group of 3 raw 32-byte slots**: `[nonce, ct1, ct2]`.
@@ -195,9 +207,9 @@ Each `Enc<T, V>` **ciphertext** output produces a **group of 3 raw 32-byte slots
 
 With 10 declared ciphertext outputs, MPC sends **10 raw 32-byte slots = 320 bytes** (SIZE=320):
 ```
-Slot  0: Mxe nonce  (value = 0x01, zero-padded to 32)
-Slot  1: Mxe ct1    (packed community ciphertext) ← MXE_CT_SLOT
-Slot  2: Mxe ct2    (unused Rescue block)
+Slot  0: Mxe all-cards nonce  (value = 0x01, zero-padded to 32)
+Slot  1: Mxe all-cards ct1    (Pack<[u8;23]> — community + holes) ← MXE_CT_SLOT
+Slot  2: Mxe all-cards ct2    (unused Rescue block)
 Slot  3: P0 nonce   (output nonce for player 0)
 Slot  4: P0 ct1     ← FIRST_PLAYER_SLOT (hole card ciphertext for decryption)
 Slot  5: P0 ct2     (unused)
@@ -206,8 +218,9 @@ Slot  7: P1 ct1     ← hole card ciphertext
 Slot  8: P1 ct2     (unused)
 Slot  9: P2 nonce   (truncated — no ct1/ct2 within SIZE window)
 ```
+- **Constants:** `MXE_CT_SLOT=1`, `FIRST_PLAYER_SLOT=4`, `PLAYER_STRIDE=3`
 - **Stride=3**: `player_ct_offset(i) = (4 + i*3) * 32`, `player_nonce_offset(i) = (3 + i*3) * 32`
-- **10 slots covers HU (2 players).** For more players, increase output count (e.g., 13 for 4-max).
+- **10 slots covers HU (2 players) for client-side decryption.** Players 2-8 get cards revealed via MPC showdown.
 - **Declaring too many outputs causes MPC FAILURE** — output count must match encrypted values, not raw slots.
 - **Nonces read from raw output** — no need to compute `input_nonce + 1`.
 - **Each MPC output encrypted independently at CTR counter=0.** NOT sequential within a group.
@@ -249,8 +262,12 @@ When a callback TX fails, the Arcium node retries 5 times, then sends 5 "error c
 - **Borrow ordering in CPI handlers:** call `queue_computation()` BEFORE taking mutable borrows on `table`/`deck_state`.
 - **Callback discriminators must be pre-computed** as byte arrays. Compute with: `node -e "require('crypto').createHash('sha256').update('global:ix_name').digest().slice(0,8)"`.
 - **Callbacks MUST NOT be empty** — Arcium rejects `callbacks: vec![]` with error 6209.
-- **All MPC callbacks MUST verify BLS signatures** via `SignedComputationOutputs::verify_output()`. Without this, anyone can spoof callback data.
-  - **Localnet exception:** BLS `verify_output_raw()` fails with error 6001 on localnet Docker nodes. Use CPI context validation (`validate_arcium_callback_context`) + direct `SignedComputationOutputs::Success` pattern match as workaround. TODO: Re-enable BLS for devnet/mainnet.
+- **All MPC callbacks MUST verify BLS signatures** via `SignedComputationOutputs::verify_output_raw()`. Without this, anyone can spoof callback data.
+  - **`extract_mpc_output()` helper** (in `arcium_deal_callback.rs`) handles both modes:
+    - **Production (default):** CPI context validation + BLS `verify_output_raw()` (cryptographic proof).
+    - **Localnet (`skip-bls` feature):** CPI context validation only. BLS fails on localnet Docker nodes with error 6001 (cluster key mismatch).
+  - **Build:** `SKIP_BLS=1` (default) → localnet mode. `SKIP_BLS=0` → production mode with BLS.
+  - **All 3 callbacks** (deal, reveal, showdown) use the same `extract_mpc_output()` helper.
 - **NEVER use all-zero x25519 pubkeys** for empty seats — Arcium MPC nodes reject `[0; 32]` as invalid curve point.
 - **Callback accounts MUST include SeatCards as remaining_accounts.** Without them, the callback handler's `ctx.remaining_accounts` is empty and encrypted hole cards are never written. Add `0..max_players` SeatCards PDAs (writable) to the `CallbackInstruction.accounts` list.
 - **Only include SeatCards PDAs that exist on-chain.** Non-existent accounts (e.g., seats 2-8 for a HU table) cause the callback TX to fail silently — the MPC node can't construct the TX.
@@ -266,22 +283,23 @@ When a callback TX fails, the Arcium node retries 5 times, then sends 5 "error c
 |-----------|------|
 | shuffle_and_deal | ~8s |
 | reveal_community (flop/turn/river) | ~2s each |
-| reveal_player_cards (showdown, per player) | ~2s |
-| Full hand (all streets + showdown) | ~21s |
+| reveal_all_showdown (all 9 players, single call) | ~2s |
+| Full hand (all streets + showdown) | ~20s |
 | Quick hand (deal + fold) | ~9s |
 
 Preprocessing is cached between hands — no speedup between hand 1 and hand 5.
 
-### Multi-Player Output Constraint (SIZE=320, count=10)
+### Multi-Player Showdown — Single MPC Call for All 9 Players (Verified 2026-03-19)
 
-- **Output count MUST match circuit encrypted return values.** `shuffle_and_deal` returns 10 `Enc` values → `vec![Output::Ciphertext; 10]`. Declaring 30 causes MPC FAILURE (error 6110).
-- **Stride-3 layout:** Each encrypted value uses 3 raw 32-byte slots `[nonce, ct1, ct2]`. With 10 slots (320 bytes), only Mxe + P0 + P1 get full data. Players 2-8 SeatCards are zeroed.
-- **Players 2+ cannot decrypt cards client-side** (no ciphertext in SeatCards). They CAN still play — the MPC circuit shuffles correctly for all 9 players internally.
-- **Showdown limitation:** `arcium_showdown_queue` reads ciphertext from SeatCards. Players 2+ with zero SeatCards MUST fold before showdown.
-- **Community reveals work for any player count** (reads from DeckState encrypted_community, not SeatCards).
-- **Callback TX size limit:** Including all 9 SeatCards PDAs in the deal callback exceeds Solana's 1232-byte TX limit. MPC node logs: `"Output too large for single transaction"`. Fix: limit callback SeatCards to 2 (`min(max_players, 2)`).
-- **3-player/6-max, 6-player/6-max, 9-player/9-max E2E tests ALL PASS** (verified 2026-03-19, 140s total).
-- **Future fix options:** (1) Redesign circuit to pack all hole cards into Mxe outputs + per-player reveal calls, (2) store encrypted data in DeckState, (3) multi-callback approach.
+- **`reveal_all_showdown` reveals ALL active players' hole cards in one MPC call.** No per-player reveal needed.
+- **Input:** Single `Enc<Mxe, Pack<[u8;23]>>` (same as community) + `active_mask` u16 bitmask.
+- **Output:** 9 `PlaintextU16` values (SIZE=18). Each u16 = `(card1 << 8) | card2`. Inactive seats = `0xFFFF`.
+- **Callback writes `card1`/`card2` to SeatCards** for active players. `settle_hand` reads from SeatCards.
+- **9-player settle needs 800K CU** — add `ComputeBudgetProgram.setComputeUnitLimit({ units: 800_000 })` to settle TX.
+- **Stride-3 layout:** Each encrypted value uses 3 raw 32-byte slots `[nonce, ct1, ct2]`. With 10 slots (320 bytes), only Mxe + P0 + P1 get full Shared ciphertext. Players 2-8 SeatCards have no client-side decryptable data.
+- **Players 2+ cannot decrypt cards client-side** (no Shared ciphertext in SeatCards). They CAN still play — the MPC circuit deals correctly for all 9 players internally. Showdown reveals all via MXE Pack.
+- **Callback TX size limit:** Including all 9 SeatCards PDAs in the deal callback exceeds Solana's 1232-byte TX limit. Fix: limit callback SeatCards to 2 (`min(max_players, 2)`).
+- **3-player/6-max, 6-player/6-max, 9-player/9-max E2E tests ALL PASS** (verified 2026-03-19, 162s total).
 
 ## Arcium Localnet Rules
 

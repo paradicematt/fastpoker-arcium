@@ -79,7 +79,15 @@ cargo update -p blake3 --precise 1.5.5 2>/dev/null || true
 cargo update -p hashbrown@0.15.2 --precise 0.15.0 2>/dev/null || true
 
 echo "Building with cargo-build-sbf..."
-cargo-build-sbf
+# SKIP_BLS=1 (default for localnet): skip BLS verification in callbacks.
+# SKIP_BLS=0 or unset for production: enable BLS signature verification.
+if [ "${SKIP_BLS:-1}" = "1" ]; then
+    echo "  Features: skip-bls (localnet mode)"
+    cargo-build-sbf -- --features skip-bls
+else
+    echo "  Features: none (production mode — BLS enabled)"
+    cargo-build-sbf
+fi
 
 echo "Build complete!"
 # Copy output to workspace-level target/deploy for easy access

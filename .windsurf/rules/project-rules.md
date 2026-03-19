@@ -21,11 +21,13 @@ trigger: always_on
 
 ### 2. Card Privacy via Arcium MPC
 
-- **SeatCards store Rescue-cipher encrypted hole cards.** Each player's cards encrypted to their unique x25519 key via `Enc<Shared, u8>`. Anyone can read the account — they get ciphertext they cannot decrypt.
-- **DeckState stores MXE-encrypted community cards.** `Enc<Mxe, u8>` — nobody can read until reveal MPC callback writes plaintext.
+- **SeatCards store Rescue-cipher encrypted hole cards.** Each player's cards encrypted to their unique x25519 key via `Enc<Shared, u16>` (packed pair). Anyone can read the account — they get ciphertext they cannot decrypt.
+- **DeckState stores MXE-encrypted ALL cards** (community + holes) in a single `Pack<[u8; 23]>`. Both `reveal_community` and `reveal_all_showdown` decrypt the same MXE ciphertext.
+- **CRITICAL BUG: Arcium multi-MXE output corruption.** 2nd+ MXE output is silently corrupted. Solution: single MXE `Pack<[u8;23]>` containing all 23 cards.
 - **No Permission Program. No TEE.** Privacy comes from cryptography, not access control.
 - **Player x25519 pubkey in `PlayerSeat.x25519_pubkey`.** Provided during `seat_player`.
-- **Folded cards stay encrypted forever.** Showdown reveals only active hands.
+- **Folded cards stay encrypted forever.** Showdown reveals only active hands via `active_mask`.
+- **Showdown reveals ALL 9 players' hole cards in a single MPC call** — no per-player reveal needed.
 
 ### 3. Session Keys on L1
 
@@ -79,8 +81,11 @@ trigger: always_on
 - **Borrow ordering in CPI handlers:** call `queue_computation()` BEFORE taking mutable borrows on `table`/`deck_state`.
 - **Callback discriminators must be pre-computed** as byte arrays (e.g. `vec![0x8a, 0xf5, ...]`). Compute with: `node -e "require('crypto').createHash('sha256').update('global:ix_name').digest().slice(0,8)"`.
 - **Callbacks MUST NOT be empty** — Arcium rejects `callbacks: vec![]` with error 6209 (`invalidCallbackInstructions`).
-- **All MPC callbacks MUST verify BLS signatures** via `SignedComputationOutputs::verify_output()`. Without this, anyone can spoof callback data (threat A11).
-  - **Localnet exception:** BLS `verify_output_raw()` fails with error 6001 on localnet Docker nodes. Use CPI context validation (`validate_arcium_callback_context`) + direct `SignedComputationOutputs::Success` pattern match as workaround. TODO: Re-enable BLS for devnet/mainnet.
+- **All MPC callbacks MUST verify BLS signatures** via `extract_mpc_output()` helper (in `arcium_deal_callback.rs`).
+  - **Production (default build):** CPI context validation + BLS `verify_output_raw()` (cryptographic proof).
+  - **Localnet (`skip-bls` feature):** CPI context validation only. BLS fails on localnet Docker nodes with error 6001.
+  - **Build:** `SKIP_BLS=1` (default) → localnet. `SKIP_BLS=0` → production with BLS. Feature: `skip-bls` in `Cargo.toml`.
+  - **All 3 callbacks** (deal, reveal, showdown) use the same `extract_mpc_output()` helper.
 - **`HasSize::SIZE` VARIES BY OUTPUT TYPE — NOT always `count × 32`!**
   - `Output::Ciphertext`: 32 bytes/ea → shuffle_and_deal: 10 × 32 = **SIZE=320**
   - `Output::PlaintextU8`: 1 byte/ea → reveal_community: 5 × 1 = **SIZE=5**
@@ -94,17 +99,22 @@ trigger: always_on
 - **SeatCards offsets:** enc1=76 (ct1), enc2=108 (raw nonce slot), nonce=140 (16-byte output nonce).
 - **Callback error debugging:** Node retries 5 times, then sends 5 "error claim" TXs. **First attempt has the REAL error** (`InstructionError(1, Custom(X))`). Later retries show misleading `InstructionError(0, Custom(6000))` (InvalidAuthority) because computation was already claimed. Always `grep "InstructionError" node_0.log | head -5`.
 - **NEVER use all-zero x25519 pubkeys** for empty seats — Arcium MPC nodes reject `[0; 32]` as invalid curve point. Use `x25519.getPublicKey(randomSecretKey())` for dummy seats.
-- **`shuffle_and_deal` circuit = 2.9B ACUs** — first execution on fresh localnet requires **5-15+ minutes** preprocessing. Subsequent executions ~2-10s.
+- **`shuffle_and_deal` circuit = 3.4B ACUs (12.8MB)** — first execution on fresh localnet requires **5-15+ minutes** preprocessing. Subsequent executions ~8s.
+- **`reveal_community` circuit = 162M ACUs (160KB).** ~2s per call.
+- **`reveal_all_showdown` circuit = 178M ACUs (287KB).** ~2s, reveals all 9 players in one call.
+- **3p/6p/9p E2E tests ALL PASS** (verified 2026-03-19, 162s total).
 - **Circuit finalization required** — after `uploadCircuit`, call `buildFinalizeCompDefTx` or circuits stay in `OnchainPending` state and nodes skip execution.
 - See `docs/architecture/arcium-cpi-decision.md` for full rationale.
 
 ## Privacy Rules
 
 - **No plaintext card values on-chain during active play.** SeatCards stores Rescue ciphertext. DeckState stores MXE ciphertext.
-- **Folded cards NEVER revealed.** `reveal_showdown` uses `active_mask` bitmask — folded seats get 255.
-- **Community cards 2-5 use `Shared` encryption** (not `Mxe`) due to Arcis limitation. This is a known workaround — see `encrypted-ixs/src/lib.rs` line 104-108 and threat model A12.
+- **Folded cards NEVER revealed.** `reveal_all_showdown` uses `active_mask` bitmask — folded seats get 0xFFFF.
+- **DeckState stores same nonce+ct1** in both `encrypted_community[0..1]` and `encrypted_hole_cards[9..10]`. Both reveal circuits decrypt the same Pack.
 - **E2E privacy tests MUST verify:** (1) opponent SeatCards are ciphertext (not readable), (2) DeckState community cards are encrypted before reveal, (3) folded cards stay 255 after showdown.
 - **x25519 keypairs are per-player, per-session.** Derived from wallet signature in frontend. Stored in `PlayerSeat.x25519_pubkey` on-chain.
+- **Arcis Pack<T> compiler quirk:** `Pack::new()` fails with `[{integer}; N]`. Must use `[0u8; N]` + element-by-element assignment ("Blackjack pattern").
+- **9-player settle needs 800K CU** — add `ComputeBudgetProgram.setComputeUnitLimit({ units: 800_000 })` to settle TX.
 
 ## Arcium Localnet Rules
 

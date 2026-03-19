@@ -11,26 +11,28 @@ mod circuits {
         38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51,
     ];
 
+    // ALL cards (5 community + 18 hole = 23 bytes) packed into a SINGLE MXE output.
+    // Pack<[u8; 23]> = 1 field element (23 bytes / 26 per element).
+    // Using a single MXE output avoids the Arcium bug where the second MXE output
+    // in a multi-MXE circuit produces corrupted ciphertext.
+    // Layout: [comm1, comm2, comm3, comm4, comm5, p0c1, p0c2, p1c1, ..., p8c2]
+    type AllCards = Pack<[u8; 23]>;
+
     // ========================================================================
     // Circuit 1: shuffle_and_deal
     //
     // Shuffles a 52-card deck and outputs:
-    //   - Community cards encrypted to MXE (packed u64)
-    //   - ALL hole cards encrypted to MXE (packed u128, 7-bit per card)
+    //   - ALL 23 cards (5 community + 18 hole) in a single MXE Pack
     //   - Per-player hole cards encrypted to Shared (Enc<Shared, u16>)
     //
-    // The MXE packed u128 enables full 9-player showdown: the on-chain callback
-    // stores it in DeckState, and reveal_all_showdown decrypts all cards at once.
+    // Single MXE output eliminates the multi-MXE corruption bug.
     //
-    // Per-player Shared outputs give P0+P1 client-side card viewing (stride-3
-    // layout with 11 outputs = 352 bytes fits 2 full Mxe groups + P0 full + P1 partial).
-    //
-    // Total outputs: 2 Mxe + 9 Shared = 11 ciphertexts. SIZE = 352 bytes.
+    // Total outputs: 1 Mxe(Pack) + 9 Shared = 10 ciphertexts.
+    // SIZE = 10 × 32 = 320 bytes.
     // ========================================================================
     #[instruction]
     pub fn shuffle_and_deal(
-        mxe_comm: Mxe,
-        mxe_holes: Mxe,
+        mxe_all: Mxe,
         p0: Shared,
         p1: Shared,
         p2: Shared,
@@ -42,14 +44,8 @@ mod circuits {
         p8: Shared,
         num_players: u8,
     ) -> (
-        // Packed community cards: u64 = comm1*256^4 + ... + comm5
-        Enc<Mxe, u64>,
-        // ALL hole cards 7-bit packed into u128 (18 cards × 7 bits = 126 bits)
-        // Packing: packed = p0c1*128^17 + p0c2*128^16 + p1c1*128^15 + ... + p8c2*128^0
-        // Card values 0-51 (dealt), 127 = NOT_DEALT sentinel
-        Enc<Mxe, u128>,
-        // Player 0-8 packed hole cards (card1 * 256 + card2) for client-side decrypt
-        Enc<Shared, u16>,
+        Enc<Mxe, AllCards>,   // All 23 cards via Pack<[u8; 23]> (1 field element)
+        Enc<Shared, u16>,     // Player 0-8 packed hole cards (card1*256+card2) for client decrypt
         Enc<Shared, u16>,
         Enc<Shared, u16>,
         Enc<Shared, u16>,
@@ -76,64 +72,36 @@ mod circuits {
         let p7_pack: u16 = if num_players > 7 { (deck[14] as u16) * 256 + (deck[15] as u16) } else { not_dealt };
         let p8_pack: u16 = if num_players > 8 { (deck[16] as u16) * 256 + (deck[17] as u16) } else { not_dealt };
 
-        // Pack ALL 18 hole cards into u128 using 7-bit encoding (card values 0-51, sentinel 127)
-        // Packing order: p0c1, p0c2, p1c1, p1c2, ..., p8c1, p8c2
-        // Each card uses 7 bits (max 127). Total: 18 × 7 = 126 bits ≤ 128.
-        let nd7: u128 = 127; // 7-bit NOT_DEALT sentinel
-        let mut packed_holes: u128 = 0;
-        // Helper: pack card into 7-bit slot using multiply-and-add
-        // Position 0 = most significant (p0c1), position 17 = least significant (p8c2)
-        let cards: [u128; 18] = [
-            if num_players > 0 { deck[0] as u128 } else { nd7 },
-            if num_players > 0 { deck[1] as u128 } else { nd7 },
-            if num_players > 1 { deck[2] as u128 } else { nd7 },
-            if num_players > 1 { deck[3] as u128 } else { nd7 },
-            if num_players > 2 { deck[4] as u128 } else { nd7 },
-            if num_players > 2 { deck[5] as u128 } else { nd7 },
-            if num_players > 3 { deck[6] as u128 } else { nd7 },
-            if num_players > 3 { deck[7] as u128 } else { nd7 },
-            if num_players > 4 { deck[8] as u128 } else { nd7 },
-            if num_players > 4 { deck[9] as u128 } else { nd7 },
-            if num_players > 5 { deck[10] as u128 } else { nd7 },
-            if num_players > 5 { deck[11] as u128 } else { nd7 },
-            if num_players > 6 { deck[12] as u128 } else { nd7 },
-            if num_players > 6 { deck[13] as u128 } else { nd7 },
-            if num_players > 7 { deck[14] as u128 } else { nd7 },
-            if num_players > 7 { deck[15] as u128 } else { nd7 },
-            if num_players > 8 { deck[16] as u128 } else { nd7 },
-            if num_players > 8 { deck[17] as u128 } else { nd7 },
-        ];
-        // Pack: packed = cards[0]*128^17 + cards[1]*128^16 + ... + cards[17]*128^0
-        // Unrolled — Arcis does not support while loops
-        packed_holes = packed_holes * 128 + cards[0];
-        packed_holes = packed_holes * 128 + cards[1];
-        packed_holes = packed_holes * 128 + cards[2];
-        packed_holes = packed_holes * 128 + cards[3];
-        packed_holes = packed_holes * 128 + cards[4];
-        packed_holes = packed_holes * 128 + cards[5];
-        packed_holes = packed_holes * 128 + cards[6];
-        packed_holes = packed_holes * 128 + cards[7];
-        packed_holes = packed_holes * 128 + cards[8];
-        packed_holes = packed_holes * 128 + cards[9];
-        packed_holes = packed_holes * 128 + cards[10];
-        packed_holes = packed_holes * 128 + cards[11];
-        packed_holes = packed_holes * 128 + cards[12];
-        packed_holes = packed_holes * 128 + cards[13];
-        packed_holes = packed_holes * 128 + cards[14];
-        packed_holes = packed_holes * 128 + cards[15];
-        packed_holes = packed_holes * 128 + cards[16];
-        packed_holes = packed_holes * 128 + cards[17];
-
-        // Community cards: positions 18-22 (after max 18 hole cards for 9 players)
-        let packed_comm: u64 = (deck[18] as u64) * 256 * 256 * 256 * 256
-                             + (deck[19] as u64) * 256 * 256 * 256
-                             + (deck[20] as u64) * 256 * 256
-                             + (deck[21] as u64) * 256
-                             + (deck[22] as u64);
+        // Pack ALL 23 cards into Pack<[u8; 23]> — single MXE output.
+        // Layout: [comm1..comm5, p0c1, p0c2, p1c1, p1c2, ..., p8c1, p8c2]
+        // Using Blackjack pattern: init with zeros, then assign (avoids Arcis Pack type inference issue).
+        let mut all_cards: [u8; 23] = [0u8; 23];
+        all_cards[0]  = deck[18]; // comm1
+        all_cards[1]  = deck[19]; // comm2
+        all_cards[2]  = deck[20]; // comm3
+        all_cards[3]  = deck[21]; // comm4
+        all_cards[4]  = deck[22]; // comm5
+        all_cards[5]  = deck[0];  // p0c1
+        all_cards[6]  = deck[1];  // p0c2
+        all_cards[7]  = deck[2];  // p1c1
+        all_cards[8]  = deck[3];  // p1c2
+        all_cards[9]  = deck[4];  // p2c1
+        all_cards[10] = deck[5];  // p2c2
+        all_cards[11] = deck[6];  // p3c1
+        all_cards[12] = deck[7];  // p3c2
+        all_cards[13] = deck[8];  // p4c1
+        all_cards[14] = deck[9];  // p4c2
+        all_cards[15] = deck[10]; // p5c1
+        all_cards[16] = deck[11]; // p5c2
+        all_cards[17] = deck[12]; // p6c1
+        all_cards[18] = deck[13]; // p6c2
+        all_cards[19] = deck[14]; // p7c1
+        all_cards[20] = deck[15]; // p7c2
+        all_cards[21] = deck[16]; // p8c1
+        all_cards[22] = deck[17]; // p8c2
 
         (
-            mxe_comm.from_arcis(packed_comm),
-            mxe_holes.from_arcis(packed_holes),
+            mxe_all.from_arcis(Pack::new(all_cards)),
             p0.from_arcis(p0_pack),
             p1.from_arcis(p1_pack),
             p2.from_arcis(p2_pack),
@@ -149,30 +117,24 @@ mod circuits {
     // ========================================================================
     // Circuit 2: reveal_community
     //
-    // Decrypts MXE-encrypted community cards and returns them as plaintext.
+    // Decrypts the single MXE Pack and returns community cards as plaintext.
     // Called at flop (3), turn (4), river (5) — num_to_reveal controls how many.
     // Returns all 5 slots; unrevealed slots return 255.
     // ========================================================================
     #[instruction]
     pub fn reveal_community(
-        packed_community: Enc<Mxe, u64>,
+        packed_all: Enc<Mxe, AllCards>,
         num_to_reveal: u8,
     ) -> (u8, u8, u8, u8, u8) {
-        // Unpack: u64 = comm1*256^4 + comm2*256^3 + comm3*256^2 + comm4*256 + comm5
-        let packed = packed_community.to_arcis();
-        let c1 = (packed / (256 * 256 * 256 * 256)) as u8;
-        let c2 = ((packed / (256 * 256 * 256)) % 256) as u8;
-        let c3 = ((packed / (256 * 256)) % 256) as u8;
-        let c4 = ((packed / 256) % 256) as u8;
-        let c5 = (packed % 256) as u8;
-
+        let all: [u8; 23] = packed_all.to_arcis().unpack();
+        // Community cards are at indices 0-4
         let not_revealed: u8 = 255;
 
-        let r1 = if num_to_reveal >= 1 { c1 } else { not_revealed };
-        let r2 = if num_to_reveal >= 2 { c2 } else { not_revealed };
-        let r3 = if num_to_reveal >= 3 { c3 } else { not_revealed };
-        let r4 = if num_to_reveal >= 4 { c4 } else { not_revealed };
-        let r5 = if num_to_reveal >= 5 { c5 } else { not_revealed };
+        let r1 = if num_to_reveal >= 1 { all[0] } else { not_revealed };
+        let r2 = if num_to_reveal >= 2 { all[1] } else { not_revealed };
+        let r3 = if num_to_reveal >= 3 { all[2] } else { not_revealed };
+        let r4 = if num_to_reveal >= 4 { all[3] } else { not_revealed };
+        let r5 = if num_to_reveal >= 5 { all[4] } else { not_revealed };
 
         (r1.reveal(), r2.reveal(), r3.reveal(), r4.reveal(), r5.reveal())
     }
@@ -180,47 +142,24 @@ mod circuits {
     // ========================================================================
     // Circuit 3: reveal_all_showdown
     //
-    // Decrypts ALL players' hole cards at showdown from the MXE-packed u128.
-    // Takes the Enc<Mxe, u128> from DeckState (written by shuffle_and_deal callback)
-    // and an active_mask (u16 bitmask of which seats are active at showdown).
+    // Decrypts the single MXE Pack and returns ALL players' hole cards.
+    // Takes the same Enc<Mxe, Pack<[u8;23]>> as reveal_community.
     //
     // Returns 9 packed u16 values (card1*256+card2). Inactive/folded seats get 0xFFFF.
     //
-    // Single MPC call reveals all players simultaneously — no per-player calls needed.
-    //
-    // Parameters: PlaintextU128 (MXE nonce) + Ciphertext (packed holes ct) + PlaintextU16 (active_mask)
+    // Parameters: PlaintextU128 (nonce) + Ciphertext (Pack ct) + PlaintextU16 (mask)
     // Output: 9 × PlaintextU16
     // ========================================================================
     #[instruction]
     pub fn reveal_all_showdown(
-        packed_holes: Enc<Mxe, u128>,
+        packed_all: Enc<Mxe, AllCards>,
         active_mask: u16,
     ) -> (u16, u16, u16, u16, u16, u16, u16, u16, u16) {
-        let packed = packed_holes.to_arcis();
+        let all: [u8; 23] = packed_all.to_arcis().unpack();
         let not_dealt: u16 = 255 * 256 + 255; // 0xFFFF
 
-        // Unpack 7-bit encoded cards from u128 via repeated div/mod by 128
-        // packed = p0c1*128^17 + p0c2*128^16 + ... + p8c2*128^0
-        // Extract from LSB (p8c2) to MSB (p0c1), unrolled — Arcis has no while loops
-        let mut rem = packed;
-        let p8c2 = rem % 128; rem = rem / 128;
-        let p8c1 = rem % 128; rem = rem / 128;
-        let p7c2 = rem % 128; rem = rem / 128;
-        let p7c1 = rem % 128; rem = rem / 128;
-        let p6c2 = rem % 128; rem = rem / 128;
-        let p6c1 = rem % 128; rem = rem / 128;
-        let p5c2 = rem % 128; rem = rem / 128;
-        let p5c1 = rem % 128; rem = rem / 128;
-        let p4c2 = rem % 128; rem = rem / 128;
-        let p4c1 = rem % 128; rem = rem / 128;
-        let p3c2 = rem % 128; rem = rem / 128;
-        let p3c1 = rem % 128; rem = rem / 128;
-        let p2c2 = rem % 128; rem = rem / 128;
-        let p2c1 = rem % 128; rem = rem / 128;
-        let p1c2 = rem % 128; rem = rem / 128;
-        let p1c1 = rem % 128; rem = rem / 128;
-        let p0c2 = rem % 128; rem = rem / 128;
-        let p0c1 = rem % 128;
+        // Hole cards start at index 5 in the Pack
+        // Layout: [comm1..comm5, p0c1, p0c2, p1c1, ..., p8c2]
 
         // Extract active_mask bits via div/mod (Arcis has no bitwise &)
         let b0: u16 = active_mask % 2;
@@ -234,15 +173,15 @@ mod circuits {
         let b8: u16 = (active_mask / 256) % 2;
 
         // Build per-player packed u16 (card1*256+card2), applying active_mask
-        let s0: u16 = if b0 > 0 { (p0c1 as u16) * 256 + (p0c2 as u16) } else { not_dealt };
-        let s1: u16 = if b1 > 0 { (p1c1 as u16) * 256 + (p1c2 as u16) } else { not_dealt };
-        let s2: u16 = if b2 > 0 { (p2c1 as u16) * 256 + (p2c2 as u16) } else { not_dealt };
-        let s3: u16 = if b3 > 0 { (p3c1 as u16) * 256 + (p3c2 as u16) } else { not_dealt };
-        let s4: u16 = if b4 > 0 { (p4c1 as u16) * 256 + (p4c2 as u16) } else { not_dealt };
-        let s5: u16 = if b5 > 0 { (p5c1 as u16) * 256 + (p5c2 as u16) } else { not_dealt };
-        let s6: u16 = if b6 > 0 { (p6c1 as u16) * 256 + (p6c2 as u16) } else { not_dealt };
-        let s7: u16 = if b7 > 0 { (p7c1 as u16) * 256 + (p7c2 as u16) } else { not_dealt };
-        let s8: u16 = if b8 > 0 { (p8c1 as u16) * 256 + (p8c2 as u16) } else { not_dealt };
+        let s0: u16 = if b0 > 0 { (all[5] as u16) * 256 + (all[6] as u16) } else { not_dealt };
+        let s1: u16 = if b1 > 0 { (all[7] as u16) * 256 + (all[8] as u16) } else { not_dealt };
+        let s2: u16 = if b2 > 0 { (all[9] as u16) * 256 + (all[10] as u16) } else { not_dealt };
+        let s3: u16 = if b3 > 0 { (all[11] as u16) * 256 + (all[12] as u16) } else { not_dealt };
+        let s4: u16 = if b4 > 0 { (all[13] as u16) * 256 + (all[14] as u16) } else { not_dealt };
+        let s5: u16 = if b5 > 0 { (all[15] as u16) * 256 + (all[16] as u16) } else { not_dealt };
+        let s6: u16 = if b6 > 0 { (all[17] as u16) * 256 + (all[18] as u16) } else { not_dealt };
+        let s7: u16 = if b7 > 0 { (all[19] as u16) * 256 + (all[20] as u16) } else { not_dealt };
+        let s8: u16 = if b8 > 0 { (all[21] as u16) * 256 + (all[22] as u16) } else { not_dealt };
 
         (
             s0.reveal(), s1.reveal(), s2.reveal(), s3.reveal(), s4.reveal(),

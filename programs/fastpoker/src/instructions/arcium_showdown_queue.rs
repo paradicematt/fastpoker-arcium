@@ -142,21 +142,20 @@ pub fn handler(
     require!(table.phase == GamePhase::Showdown, PokerError::InvalidActionForPhase);
 
     // Build MPC args for reveal_all_showdown circuit:
-    // reveal_all_showdown(packed_holes: Enc<Mxe, u128>, active_mask: u16) -> (u16 × 9)
+    // reveal_all_showdown(packed_holes: Enc<Mxe, Pack<[u8;18]>>, active_mask: u16)
     //
-    // Args in ArgBuilder order (Enc<Mxe> pattern):
-    //   .plaintext_u128(mxe_nonce) — from DeckState.encrypted_hole_cards[9] (first 16 bytes)
-    //   .encrypted_u128(ct_bytes)  — from DeckState.encrypted_hole_cards[10] (ct1)
-    //   .plaintext_u16(active_mask)— seats_occupied & !seats_folded
-    let nonce_slot = deck_state.encrypted_hole_cards[9]; // 32-byte slot, nonce in first 16
+    // Args in ArgBuilder order (1 × Enc<Mxe> pattern):
+    //   .plaintext_u128(nonce) + .encrypted_u128(ct)  — from DeckState[9..10]
+    //   .plaintext_u16(active_mask)
+    let nonce_slot = deck_state.encrypted_hole_cards[9];
     let mxe_nonce = u128::from_le_bytes(nonce_slot[..16].try_into().unwrap());
-    let ct_bytes = deck_state.encrypted_hole_cards[10]; // 32-byte Rescue ciphertext
+    let mxe_ct = deck_state.encrypted_hole_cards[10];
 
     let active_mask = table.seats_occupied & !table.seats_folded;
 
     let args = ArgBuilder::new()
         .plaintext_u128(mxe_nonce)
-        .encrypted_u128(ct_bytes)
+        .encrypted_u128(mxe_ct)  // Pack<[u8;18]> = 1 field element, same as any 32-byte ct
         .plaintext_u16(active_mask)
         .build();
 

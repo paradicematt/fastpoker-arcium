@@ -29,14 +29,14 @@ pub const COMP_DEF_OFFSET_REVEAL:   u32 = arcium_anchor::comp_def_offset("reveal
 pub const COMP_DEF_OFFSET_SHOWDOWN: u32 = arcium_anchor::comp_def_offset("reveal_all_showdown");
 
 // ── Circuit compiled sizes (from `wc -c build/*.arcis`) ──
-pub const CIRCUIT_LEN_SHUFFLE:  u32 = 12_804_188;
-pub const CIRCUIT_LEN_REVEAL:   u32 = 142_940;
-pub const CIRCUIT_LEN_SHOWDOWN: u32 = 232_722;
+pub const CIRCUIT_LEN_SHUFFLE:  u32 = 12_761_152;
+pub const CIRCUIT_LEN_REVEAL:   u32 = 160_320;
+pub const CIRCUIT_LEN_SHOWDOWN: u32 = 287_108;
 
 // ── Circuit weights (from build/*.weight → "weight" field) ──
-pub const WEIGHT_SHUFFLE:  u64 = 3_397_767_196;
-pub const WEIGHT_REVEAL:   u64 = 160_781_192;
-pub const WEIGHT_SHOWDOWN: u64 = 170_525_492;
+pub const WEIGHT_SHUFFLE:  u64 = 3_376_009_244;
+pub const WEIGHT_REVEAL:   u64 = 161_904_336;
+pub const WEIGHT_SHOWDOWN: u64 = 177_694_504;
 
 // ─────────────────────────────────────────────────────────────
 // InitShuffleCompDef — registers shuffle_and_deal circuit
@@ -79,11 +79,10 @@ impl<'info> InitCompDefAccs<'info> for InitShuffleCompDef<'info> {
     fn lut_program(&self) -> AccountInfo<'info> { self.lut_program.to_account_info() }
     fn system_program(&self) -> AccountInfo<'info> { self.system_program.to_account_info() }
     fn params(&self) -> Vec<Parameter> {
-        // shuffle_and_deal(mxe_comm: Mxe, mxe_holes: Mxe, p0..p8: Shared, num_players: u8)
-        // Each Mxe = struct{u128} (nonce). Each Shared = struct{x25519_pubkey, u128}.
+        // shuffle_and_deal(mxe_all: Mxe, p0..p8: Shared, num_players: u8)
+        // Single Mxe = struct{u128} (nonce). Each Shared = struct{x25519_pubkey, u128}.
         vec![
-            Parameter::PlaintextU128,       // mxe_comm nonce
-            Parameter::PlaintextU128,       // mxe_holes nonce
+            Parameter::PlaintextU128,       // mxe_all nonce (Pack<[u8;23]> = community + holes)
             Parameter::ArcisX25519Pubkey,   // p0 pubkey
             Parameter::PlaintextU128,       // p0 nonce
             Parameter::ArcisX25519Pubkey,   // p1 pubkey
@@ -106,11 +105,10 @@ impl<'info> InitCompDefAccs<'info> for InitShuffleCompDef<'info> {
         ]
     }
     fn outputs(&self) -> Vec<Output> {
-        // 11 encrypted values: 1 Enc<Mxe,u64> community + 1 Enc<Mxe,u128> packed holes + 9 Enc<Shared,u16>.
-        // MPC sends 11 × 32 = 352 bytes. Stride-3 layout:
-        //   Mxe community (slots 0-2) + Mxe packed_holes (slots 3-5) + P0 Shared (slots 6-8)
-        //   + P1 nonce+ct1 (slots 9-10). All 9 players' cards in MXE pack for showdown.
-        vec![Output::Ciphertext; 11]
+        // 10 encrypted values: 1 Enc<Mxe,Pack<[u8;23]>> all-cards + 9 Enc<Shared,u16>.
+        // MPC sends 10 × 32 = 320 bytes. Stride-3 layout:
+        //   Mxe all-cards (slots 0-2) + P0 Shared (slots 3-5) + P1 (slots 6-8) + P2 nonce (slot 9).
+        vec![Output::Ciphertext; 10]
     }
     fn comp_def_offset(&self) -> u32 { COMP_DEF_OFFSET_SHUFFLE }
     fn compiled_circuit_len(&self) -> u32 { CIRCUIT_LEN_SHUFFLE }
@@ -164,11 +162,11 @@ impl<'info> InitCompDefAccs<'info> for InitRevealCompDef<'info> {
     fn lut_program(&self) -> AccountInfo<'info> { self.lut_program.to_account_info() }
     fn system_program(&self) -> AccountInfo<'info> { self.system_program.to_account_info() }
     fn params(&self) -> Vec<Parameter> {
-        // reveal_community(packed_community: Enc<Mxe,u64>, num_to_reveal: u8)
-        // Enc<Mxe, u64> decomposes to: nonce (u128) + ciphertext (from .idarc interface)
+        // reveal_community(packed_all: Enc<Mxe, Pack<[u8;23]>>, num_to_reveal: u8)
+        // Enc<Mxe, Pack<[u8;23]>> = 1 field element: nonce (u128) + ciphertext
         vec![
-            Parameter::PlaintextU128, // packed_community nonce (MXE output nonce)
-            Parameter::Ciphertext,    // packed_community ciphertext (Rescue ct)
+            Parameter::PlaintextU128, // packed_all nonce (MXE output nonce)
+            Parameter::Ciphertext,    // packed_all ciphertext (Pack<[u8;23]>)
             Parameter::PlaintextU8,   // num_to_reveal
         ]
     }
@@ -228,11 +226,11 @@ impl<'info> InitCompDefAccs<'info> for InitShowdownCompDef<'info> {
     fn lut_program(&self) -> AccountInfo<'info> { self.lut_program.to_account_info() }
     fn system_program(&self) -> AccountInfo<'info> { self.system_program.to_account_info() }
     fn params(&self) -> Vec<Parameter> {
-        // reveal_all_showdown(packed_holes: Enc<Mxe, u128>, active_mask: u16)
-        // Enc<Mxe, u128> decomposes to: PlaintextU128 (nonce) + Ciphertext (ct)
+        // reveal_all_showdown(packed_holes: Enc<Mxe, Pack<[u8;18]>>, active_mask: u16)
+        // Enc<Mxe, Pack<[u8;18]>> = 1 field element: PlaintextU128 (nonce) + Ciphertext (ct)
         vec![
             Parameter::PlaintextU128, // MXE nonce for packed_holes
-            Parameter::Ciphertext,    // packed_holes ciphertext (Rescue ct)
+            Parameter::Ciphertext,    // packed_holes ciphertext (Pack<[u8;18]>)
             Parameter::PlaintextU16,  // active_mask bitmask
         ]
     }

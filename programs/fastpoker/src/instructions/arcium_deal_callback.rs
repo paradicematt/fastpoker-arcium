@@ -37,41 +37,34 @@ pub struct ShuffleAndDealOutput {
 
 impl HasSize for ShuffleAndDealOutput {
     // SIZE = bytes of raw MPC output in the callback IX data.
-    // Output count (11) must match encrypted return values in circuit. MPC sends count × 32 bytes.
+    // Output count (10) must match encrypted return values in circuit. MPC sends count × 32 bytes.
     // Each encrypted value uses stride=3 in the raw output: [nonce(32), ct1(32), ct2(32)].
-    // With 11 outputs = 352 bytes:
-    //   Mxe community (3) + Mxe packed_holes (3) + P0 Shared (3) + P1 nonce+ct1 (2) = 11 slots.
-    // All 9 players' cards in MXE pack. P0+P1 get client-side Shared decrypt.
-    const SIZE: usize = 352;
+    // With 10 outputs = 320 bytes:
+    //   Mxe all-cards Pack<[u8;23]> (3) + P0 Shared (3) + P1 (3) + P2 nonce (1) = 10 slots.
+    // Single MXE output contains both community and hole cards.
+    const SIZE: usize = 320;
 }
 
-// Raw MPC output: 11 × 32-byte slots (SIZE=352).
+// Raw MPC output: 10 × 32-byte slots (SIZE=320).
 // Each Enc<T,V> output group = 3 slots: [nonce(32), ct1(32), ct2(32)].
-// With 11 outputs, stride-3 covers:
-//   Mxe community (slots 0-2) + Mxe packed_holes (slots 3-5)
-//   + P0 Shared (slots 6-8) + P1 nonce+ct1 (slots 9-10).
 // ct1 = primary ciphertext (the encrypted field element we need).
 // ct2 = second Rescue block (internal padding, not used for decryption).
 const SLOT_SIZE: usize = 32;
 // Layout:
-// Slot  0: Mxe community nonce
-// Slot  1: Mxe community ct1    (packed community ciphertext)
-// Slot  2: Mxe community ct2    (unused Rescue block)
-// Slot  3: Mxe packed_holes nonce
-// Slot  4: Mxe packed_holes ct1  (u128: all 18 hole cards, 7-bit packed)
-// Slot  5: Mxe packed_holes ct2  (unused Rescue block)
-// Slot  6: P0 nonce
-// Slot  7: P0 ct1               ← hole card ciphertext for client decrypt
-// Slot  8: P0 ct2               (unused)
-// Slot  9: P1 nonce
-// Slot 10: P1 ct1               ← hole card ciphertext (no ct2 but not needed)
-const MXE_COMM_CT_SLOT: usize = 1;    // community ct at slot 1
-const MXE_HOLES_NONCE_SLOT: usize = 3; // packed_holes nonce at slot 3
-const MXE_HOLES_CT_SLOT: usize = 4;    // packed_holes ct1 at slot 4
-const MXE_HOLES_CT2_SLOT: usize = 5;   // packed_holes ct2 at slot 5
-const FIRST_PLAYER_SLOT: usize = 7;    // P0 ct1 at slot 7 (after 2 Mxe groups of 3)
-const PLAYER_STRIDE: usize = 3;        // nonce + ct1 + ct2 per player
-const TOTAL_OUTPUT_SIZE: usize = 352;   // 11 slots × 32 bytes
+// Slot  0: Mxe all-cards nonce
+// Slot  1: Mxe all-cards ct1    (Pack<[u8;23]> — community + hole cards)
+// Slot  2: Mxe all-cards ct2    (unused Rescue block)
+// Slot  3: P0 nonce
+// Slot  4: P0 ct1               ← hole card ciphertext for client decrypt
+// Slot  5: P0 ct2               (unused)
+// Slot  6: P1 nonce
+// Slot  7: P1 ct1               ← hole card ciphertext for client decrypt
+// Slot  8: P1 ct2               (unused)
+// Slot  9: P2 nonce             (truncated — no ct within SIZE window)
+const MXE_CT_SLOT: usize = 1;            // all-cards ct at slot 1
+const FIRST_PLAYER_SLOT: usize = 4;      // P0 ct1 at slot 4 (after 1 Mxe group of 3)
+const PLAYER_STRIDE: usize = 3;          // nonce + ct1 + ct2 per player
+const TOTAL_OUTPUT_SIZE: usize = 320;    // 10 slots × 32 bytes
 
 #[derive(Accounts)]
 pub struct ShuffleAndDealCallback<'info> {
@@ -156,28 +149,63 @@ pub(crate) fn validate_arcium_callback_context(
     Ok(())
 }
 
+/// Extract raw bytes from MPC callback output with verification.
+///
+/// Production (default): BLS signature verification via `verify_output_raw()`.
+/// Localnet (`skip-bls` feature): CPI context validation only (BLS fails on localnet Docker nodes
+/// with error 6001 due to cluster key mismatch).
+///
+/// CPI context validation always runs as a baseline check regardless of BLS.
+pub(crate) fn extract_mpc_output<O: HasSize + AnchorSerialize + AnchorDeserialize>(
+    output: SignedComputationOutputs<O>,
+    cluster_account: &Account<Cluster>,
+    computation_account: &UncheckedAccount,
+    instructions_sysvar: &AccountInfo,
+    arcium_program_key: &Pubkey,
+) -> Result<Vec<u8>> {
+    // Always validate CPI context — preceding IX must be Arcium's callbackComputation
+    validate_arcium_callback_context(instructions_sysvar, arcium_program_key)?;
+
+    #[cfg(not(feature = "skip-bls"))]
+    {
+        // Production: BLS signature verification (cryptographic proof)
+        let raw_bytes = output
+            .verify_output_raw(cluster_account, computation_account)
+            .map_err(|e| {
+                msg!("BLS verification failed: {:?}", e);
+                PokerError::ArciumCallbackInvalid
+            })?;
+        msg!("BLS verification PASSED ({} bytes)", raw_bytes.len());
+        return Ok(raw_bytes);
+    }
+
+    #[cfg(feature = "skip-bls")]
+    {
+        // Localnet: skip BLS, extract raw bytes directly
+        let _ = (cluster_account, computation_account); // suppress unused warnings
+        match output {
+            SignedComputationOutputs::Success(bytes, _sig) => Ok(bytes),
+            SignedComputationOutputs::Failure => {
+                msg!("MPC computation failed (Failure variant)");
+                Err(PokerError::ArciumComputationTimeout.into())
+            }
+            _ => Err(PokerError::ArciumCallbackInvalid.into()),
+        }
+    }
+}
+
 pub fn shuffle_and_deal_callback_handler(
     ctx: Context<ShuffleAndDealCallback>,
     output: SignedComputationOutputs<ShuffleAndDealOutput>,
 ) -> Result<()> {
-    // Extract raw bytes from SignedComputationOutputs without BLS verification.
-    // BLS verify_output_raw() fails on localnet (error 6001) due to cluster key mismatch —
-    // known Arcium localnet limitation. We use CPI context validation instead:
-    // validate_arcium_callback_context checks the preceding IX is Arcium's callbackComputation.
-    // TODO: Re-enable BLS verification for devnet/mainnet where cluster keys are stable.
-    validate_arcium_callback_context(
+    // Extract raw bytes with BLS verification (production) or CPI-only (localnet skip-bls).
+    let raw_bytes = extract_mpc_output(
+        output,
+        &ctx.accounts.cluster_account,
+        &ctx.accounts.computation_account,
         &ctx.accounts.instructions_sysvar,
         &ctx.accounts.arcium_program.key(),
     )?;
-
-    let raw_bytes = match output {
-        SignedComputationOutputs::Success(bytes, _sig) => bytes,
-        SignedComputationOutputs::Failure => {
-            msg!("MPC computation failed (Failure variant)");
-            return Err(PokerError::ArciumComputationTimeout.into());
-        }
-        _ => return Err(PokerError::ArciumCallbackInvalid.into()),
-    };
     msg!("MPC SUCCESS: {} bytes raw output (expected {})", raw_bytes.len(), TOTAL_OUTPUT_SIZE);
 
     // DIAGNOSTIC: dump first 8 bytes of each 32-byte slot to identify layout
@@ -235,22 +263,25 @@ pub fn shuffle_and_deal_callback_handler(
         }
     }
 
-    // Write MXE community encrypted group to DeckState for reveal_community.
-    // MPC stride=3: slot 0 = nonce, slot 1 = ct1, slot 2 = ct2.
-    deck_state.encrypted_community[0] = get_slot(&raw_bytes, 0);                           // comm nonce
-    deck_state.encrypted_community[1] = get_slot(&raw_bytes, MXE_COMM_CT_SLOT * SLOT_SIZE); // comm ct1
-    deck_state.encrypted_community[2] = get_slot(&raw_bytes, 2 * SLOT_SIZE);                // comm ct2
+    // Single MXE Pack<[u8;23]> at slots 0-2 contains BOTH community and hole cards.
+    // Store nonce + ct1 in encrypted_community[0..1] for reveal_community,
+    // AND in encrypted_hole_cards[9..10] for reveal_all_showdown.
+    // Both reveal circuits decrypt the exact same ciphertext.
+    let mxe_nonce = get_slot(&raw_bytes, 0);                       // slot 0: nonce
+    let mxe_ct1   = get_slot(&raw_bytes, MXE_CT_SLOT * SLOT_SIZE); // slot 1: ct1
+
+    // For reveal_community
+    deck_state.encrypted_community[0] = mxe_nonce;
+    deck_state.encrypted_community[1] = mxe_ct1;
+    deck_state.encrypted_community[2] = get_slot(&raw_bytes, 2 * SLOT_SIZE); // ct2 (unused)
     for i in 3..5 {
         deck_state.encrypted_community[i] = [0u8; 32];
     }
     deck_state.community_nonces = [[0u8; 16]; 5];
 
-    // Write MXE packed_holes encrypted group to DeckState for reveal_all_showdown.
-    // Stored in encrypted_hole_cards[9..11] (repurposing unused slots).
-    // This contains ALL 9 players' hole cards packed into a single Enc<Mxe, u128>.
-    deck_state.encrypted_hole_cards[9]  = get_slot(&raw_bytes, MXE_HOLES_NONCE_SLOT * SLOT_SIZE); // holes nonce
-    deck_state.encrypted_hole_cards[10] = get_slot(&raw_bytes, MXE_HOLES_CT_SLOT * SLOT_SIZE);    // holes ct1
-    deck_state.encrypted_hole_cards[11] = get_slot(&raw_bytes, MXE_HOLES_CT2_SLOT * SLOT_SIZE);   // holes ct2
+    // For reveal_all_showdown (same nonce + ct1)
+    deck_state.encrypted_hole_cards[9]  = mxe_nonce;
+    deck_state.encrypted_hole_cards[10] = mxe_ct1;
 
     // Mark shuffle complete and transition to Preflop
     deck_state.shuffle_complete = true;
