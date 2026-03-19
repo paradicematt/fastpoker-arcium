@@ -98,26 +98,16 @@ export function useArciumCards(
       setIsLoading(true);
 
       // Decrypt using Rescue cipher
-      const nonce = data.slice(SEAT_CARDS_OFFSETS.NONCE, SEAT_CARDS_OFFSETS.NONCE + 16);
+      const nonce = new Uint8Array(data.slice(SEAT_CARDS_OFFSETS.NONCE, SEAT_CARDS_OFFSETS.NONCE + 16));
       const { x25519: x25519Fn } = await import('@noble/curves/ed25519');
       const sharedSecret = x25519Fn.getSharedSecret(x25519Keypair.secretKey, mxePublicKey);
 
-      // Convert ciphertext bytes to BigInt (LE)
-      let ctBigint = BigInt(0);
-      for (let i = 31; i >= 0; i--) {
-        ctBigint = (ctBigint << BigInt(8)) | BigInt(encCard1[i]);
-      }
+      // RescueCipher.decrypt takes number[][] (array of 32-byte arrays) + Uint8Array nonce
+      const ctArray = Array.from(encCard1) as number[];
 
-      // Convert nonce bytes to BigInt (LE u128)
-      let nonceBigint = BigInt(0);
-      for (let i = 15; i >= 0; i--) {
-        nonceBigint = (nonceBigint << BigInt(8)) | BigInt(nonce[i]);
-      }
-
-      // Import RescueCipher from @arcium-hq/client
       const { RescueCipher } = await import('@arcium-hq/client');
       const cipher = new RescueCipher(sharedSecret);
-      const decrypted = cipher.decrypt([ctBigint], nonceBigint);
+      const decrypted = cipher.decrypt([ctArray], nonce);
 
       if (decrypted && decrypted.length > 0) {
         const packed = Number(decrypted[0]);
