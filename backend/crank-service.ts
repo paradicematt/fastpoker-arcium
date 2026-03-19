@@ -230,11 +230,7 @@ async function detectValidator(l1Conn: Connection, account: PublicKey): Promise<
 // Tables are discovered directly from PROGRAM_ID.
 const LOCAL_MODE = process.env.LOCAL_MODE === 'true' || process.env.LOCAL_MODE === '1';
 
-// ─── Deal Mode ───
-// Controls which deal mechanism the crank uses at Starting phase.
-//   'arcium'  — arcium_deal + queue_computation (Arcium MPC encrypted shuffle+deal) [DEFAULT]
-//   'mock'    — devnet_bypass_deal (plaintext cards, debug/testing ONLY — not for production)
-const DEAL_MODE = (process.env.DEAL_MODE || 'arcium') as 'mock' | 'arcium';
+// Deal mode is always Arcium MPC. devnet_bypass_deal has been removed (security hole).
 
 // ─── Solana RPC ───
 // Primary RPC for reading table state and sending crank transactions.
@@ -348,12 +344,6 @@ const DISC = {
   ),
   delegateCrankTally: Buffer.from(
     crypto.createHash('sha256').update('global:delegate_crank_tally').digest().slice(0, 8),
-  ),
-  devnetBypassDeal: Buffer.from(
-    crypto.createHash('sha256').update('global:devnet_bypass_deal').digest().slice(0, 8),
-  ),
-  devnetBypassReveal: Buffer.from(
-    crypto.createHash('sha256').update('global:devnet_bypass_reveal').digest().slice(0, 8),
   ),
   arciumDeal: Buffer.from(
     crypto.createHash('sha256').update('global:arcium_deal').digest().slice(0, 8),
@@ -1995,7 +1985,7 @@ function writeCrankHeartbeat(trackedCount: number, processingCount: number, stat
       recentErrors: [...recentCrankErrors],
       uptime: `${h}h ${m}m`,
       dealerStats: cachedDealerStats ?? undefined,
-      dealMode: DEAL_MODE,
+      dealMode: 'arcium',
       config: { ...crankConfig },
     };
     fs.writeFileSync(CRANK_HEARTBEAT_PATH, JSON.stringify(hb, null, 2), 'utf-8');
@@ -2746,7 +2736,7 @@ class CrankService {
     if (LOCAL_MODE) {
       console.log('🏠 LOCAL MODE — skipping delegation, LaserStream');
     }
-    console.log(`  DEAL_MODE: ${DEAL_MODE}`);
+    console.log(`  DEAL_MODE: arcium (MPC encrypted)`);
     console.log(`  RPC    : ${RPC_BASE}`);
     console.log(`  L1 RPC : ${L1_RPC}`);
     console.log(`  Payer  : ${this.payer.publicKey.toBase58()}`);
@@ -3926,9 +3916,10 @@ class CrankService {
     switch (state.phase) {
       // ─── SHOWDOWN → arcium_showdown_queue (MPC) or settle_hand ───
       case Phase.Showdown: {
-        // In arcium mode, we need to reveal hole cards via MPC before settling.
+        // Reveal hole cards via MPC before settling.
         // Check if cards are already revealed (callback already ran).
-        if (DEAL_MODE === 'arcium' && state.revealedHands && state.revealedHands[0] === 255) {
+        // revealedHands[0] === 255 means not yet revealed (CARD_NOT_DEALT).
+        if ((state as any).revealedHands && (state as any).revealedHands[0] === 255) {
           return this.crankArciumShowdown(tablePda, state);
         }
         let occ = state.seatsOccupied;
@@ -4251,11 +4242,8 @@ class CrankService {
         return false;
       }
 
-      // ─── STARTING → deal (Arcium MPC or mock) ───
+      // ─── STARTING → deal (Arcium MPC) ───
       case Phase.Starting: {
-        if (DEAL_MODE === 'mock') {
-          return this.crankMockDeal(tablePda, state);
-        }
         return this.crankArciumDeal(tablePda, state);
       }
 
@@ -4271,13 +4259,10 @@ class CrankService {
         return true; // No action — MPC callback will advance to Showdown
       }
 
-      // ─── REVEAL PENDING → arcium_reveal_queue (MPC) or mock bypass ───
+      // ─── REVEAL PENDING → arcium_reveal_queue (MPC) ───
       case Phase.FlopRevealPending:
       case Phase.TurnRevealPending:
       case Phase.RiverRevealPending: {
-        if (DEAL_MODE === 'mock') {
-          return this.crankMockReveal(tablePda, state);
-        }
         return this.crankArciumReveal(tablePda, state);
       }
 
@@ -6594,79 +6579,6 @@ class CrankService {
     if (ok) {
       console.log(`  ✅ Epoch ${epoch} resolved! Winner listed & removed from leaderboard.`);
     }
-  }
-
-  /**
-   * Mock Deal — called at Starting phase in local/mock mode.
-   * Uses devnet_bypass_deal instruction (on-chain entropy, plaintext cards).
-   * No MPC, no TEE — purely for local validator testing.
-   */
-  private async crankMockDeal(tablePda: PublicKey, fallbackState: TableState): Promise<boolean> {
-    const conn = this.getConnForTable(tablePda.toBase58());
-    let seatsOccupied = fallbackState.seatsOccupied;
-    let maxPlayers = fallbackState.maxPlayers;
-    let handNumber = fallbackState.handNumber;
-
-    try {
-      const info = await conn.getAccountInfo(tablePda);
-      if (info && info.data.length >= 256) {
-        const fresh = parseTable(Buffer.from(info.data));
-        if (fresh.phase !== Phase.Starting) {
-          console.log(`  ⏸  mock_deal skipped — phase already ${PHASE_NAMES[fresh.phase]}`);
-          return true;
-        }
-        seatsOccupied = fresh.seatsOccupied;
-        maxPlayers = fresh.maxPlayers;
-        handNumber = fresh.handNumber;
-      }
-    } catch {}
-
-    const dealTag = tablePda.toBase58().slice(0, 8);
-    const dealList = [];
-    for (let i = 0; i < maxPlayers; i++) { if (seatsOccupied & (1 << i)) dealList.push(i); }
-    console.log(`  🎲 [${dealTag}] Cranking devnet_bypass_deal (hand #${handNumber}, seats=[${dealList}])`);
-
-    const keys = [
-      { pubkey: this.teePayer.publicKey, isSigner: true, isWritable: false },
-      { pubkey: tablePda, isSigner: false, isWritable: true },
-      { pubkey: getDeckStatePda(tablePda), isSigner: false, isWritable: true },
-      { pubkey: SYSVAR_SLOT_HASHES_PUBKEY, isSigner: false, isWritable: false },
-    ];
-    // remaining_accounts: [seat_0..N, seat_cards_0..N] — PAIRS required by on-chain handler.
-    // On-chain does: total = remaining.len(); require!(total % 2 == 0); seats = [..total/2]; seat_cards = [total/2..];
-    for (let i = 0; i < maxPlayers; i++) {
-      if (seatsOccupied & (1 << i)) {
-        keys.push({ pubkey: getSeatPda(tablePda, i), isSigner: false, isWritable: true });
-      }
-    }
-    for (let i = 0; i < maxPlayers; i++) {
-      if (seatsOccupied & (1 << i)) {
-        keys.push({ pubkey: getSeatCardsPda(tablePda, i), isSigner: false, isWritable: true });
-      }
-    }
-
-    const ix = new TransactionInstruction({ programId: PROGRAM_ID, keys, data: DISC.devnetBypassDeal });
-    return sendWithRetry(conn, ix, this.teePayer, `[${dealTag}] devnet_bypass_deal`, 3, false, [6021]);
-  }
-
-  /**
-   * Mock Reveal — called at *RevealPending phases in mock mode.
-   * Uses devnet_bypass_reveal instruction (copies pre_community → community_cards).
-   * No MPC, no TEE — purely for local validator testing.
-   */
-  private async crankMockReveal(tablePda: PublicKey, fallbackState: TableState): Promise<boolean> {
-    const conn = this.getConnForTable(tablePda.toBase58());
-    const tag = tablePda.toBase58().slice(0, 8);
-    const phaseName = PHASE_NAMES[fallbackState.phase] ?? fallbackState.phase;
-    console.log(`  🃏 [${tag}] Cranking devnet_bypass_reveal (phase=${phaseName})`);
-
-    const keys = [
-      { pubkey: this.teePayer.publicKey, isSigner: true, isWritable: false },
-      { pubkey: tablePda, isSigner: false, isWritable: true },
-    ];
-
-    const ix = new TransactionInstruction({ programId: PROGRAM_ID, keys, data: DISC.devnetBypassReveal });
-    return sendWithRetry(conn, ix, this.teePayer, `[${tag}] devnet_bypass_reveal`, 3, false, []);
   }
 
   /**

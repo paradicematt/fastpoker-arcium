@@ -84,8 +84,6 @@ pub mod instructions {
     pub mod process_spl_rake_distribution;
     pub mod init_table_seat;
     pub mod reset_sng_table;
-    pub mod devnet_bypass_deal;
-    pub mod devnet_bypass_reveal;
     pub mod arcium_deal;
     pub mod arcium_deal_callback;
     pub mod arcium_reveal;
@@ -112,8 +110,6 @@ pub mod instructions {
     pub use process_spl_rake_distribution::*;
     pub use init_table_seat::*;
     pub use reset_sng_table::*;
-    pub use devnet_bypass_deal::*;
-    pub use devnet_bypass_reveal::*;
     pub use arcium_deal::*;
     pub use arcium_deal_callback::*;
     pub use arcium_reveal::*;
@@ -449,22 +445,6 @@ pub mod fastpoker {
         output: arcium_anchor::SignedComputationOutputs<instructions::arcium_showdown::RevealShowdownOutput>,
     ) -> Result<()> {
         instructions::arcium_showdown::reveal_showdown_callback_handler(ctx, output)
-    }
-
-    // === Mock Deal (Testing Without MPC) ===
-
-    /// Deal cards without MPC — deterministic shuffle from on-chain entropy.
-    /// ONLY for testing (ARCIUM_MOCK=true). In production, arcium_deal handles this.
-    pub fn devnet_bypass_deal<'info>(
-        ctx: Context<'_, '_, 'info, 'info, DevnetBypassDeal<'info>>,
-    ) -> Result<()> {
-        instructions::devnet_bypass_deal::handler(ctx)
-    }
-
-    /// Reveal community cards without MPC — advances *RevealPending phases.
-    /// ONLY for testing (ARCIUM_MOCK=true). In production, arcium_reveal handles this.
-    pub fn devnet_bypass_reveal(ctx: Context<DevnetBypassReveal>) -> Result<()> {
-        instructions::devnet_bypass_reveal::handler(ctx)
     }
 
     // === Crank Instructions ===
