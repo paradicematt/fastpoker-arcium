@@ -29,7 +29,7 @@ import {
 const PROGRAM_ID = new PublicKey('BGyLYzzS5tPASGSj6BbzpLbHVwm4Csg9C1QfD8KGDe3N');
 const RPC_URL = process.env.SOLANA_RPC_URL || 'http://localhost:8899';
 const LUT_PROGRAM_ID = new PublicKey('AddressLookupTab1e1111111111111111111111111');
-const CIRCUITS = ['shuffle_and_deal', 'reveal_community', 'reveal_player_cards'] as const;
+const CIRCUITS = ['shuffle_and_deal', 'reveal_community', 'reveal_all_showdown'] as const;
 const CIRCUIT_BUILD_DIR = process.env.CIRCUIT_BUILD_DIR || '../build';
 // When run from backend/, resolve relative to project root
 
@@ -80,7 +80,7 @@ async function main() {
   const circuits: { name: typeof CIRCUITS[number]; disc: Buffer }[] = [
     { name: 'shuffle_and_deal', disc: DISC_INIT_SHUFFLE },
     { name: 'reveal_community', disc: DISC_INIT_REVEAL },
-    { name: 'reveal_player_cards', disc: DISC_INIT_SHOWDOWN },
+    { name: 'reveal_all_showdown', disc: DISC_INIT_SHOWDOWN },
   ];
 
   for (const circuit of circuits) {

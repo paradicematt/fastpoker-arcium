@@ -6835,11 +6835,11 @@ class CrankService {
    * Arcium Showdown — called at Showdown phase in Arcium MPC mode (before settle).
    *
    * Calls arcium_showdown_queue on FastPoker program which:
-   *   1. Reads player pubkeys/nonces from DeckState (stored during arcium_deal)
-   *   2. References encrypted packed hole cards from SeatCards via .account()
-   *   3. Queues reveal_showdown MPC computation via Arcium CPI
+   *   1. Reads MXE-packed hole cards from DeckState (stored during shuffle_and_deal callback)
+   *   2. Computes active_mask from table state (seats_occupied & ~seats_folded)
+   *   3. Queues reveal_all_showdown MPC computation via Arcium CPI (single call for ALL players)
    *   4. Transitions Showdown → AwaitingShowdown
-   *   5. MPC callback fires → writes plaintext → transitions back to Showdown
+   *   5. MPC callback fires → writes all 9 players' plaintext → transitions back to Showdown
    *   6. Crank sees Showdown again with revealed cards → calls settle_hand
    */
   private async crankArciumShowdown(tablePda: PublicKey, fallbackState: TableState): Promise<boolean> {
@@ -6857,7 +6857,7 @@ class CrankService {
       const computationOffset = BigInt(fallbackState.handNumber) * BigInt(1_000_000)
         + BigInt(999) * BigInt(1_000)
         + BigInt(Date.now() % 1_000);
-      const compDefOffset = computeCompDefOffset('reveal_showdown');
+      const compDefOffset = computeCompDefOffset('reveal_all_showdown');
 
       // Derive Arcium account addresses
       const mxeAccount = getMXEAccAddress(PROGRAM_ID);
@@ -6874,12 +6874,12 @@ class CrankService {
       const deckState = getDeckStatePda(tablePda);
 
       // Build arcium_showdown_queue instruction data:
-      // disc(8) + computation_offset(u64:8) + active_mask(u16:2) = 18 bytes
-      const data = Buffer.alloc(18);
+      // disc(8) + computation_offset(u64:8) = 16 bytes
+      // (active_mask is computed on-chain from table state)
+      const data = Buffer.alloc(16);
       let offset = 0;
       DISC.arciumShowdownQueue.copy(data, offset); offset += 8;
-      data.writeBigUInt64LE(computationOffset, offset); offset += 8;
-      data.writeUInt16LE(activeMask, offset);
+      data.writeBigUInt64LE(computationOffset, offset);
 
       // Build account list matching ArciumShowdownQueue struct order
       const keys = [
@@ -6895,7 +6895,7 @@ class CrankService {
         { pubkey: clockPda,                isSigner: false, isWritable: true  }, // clock_account
         { pubkey: ARCIUM_PROGRAM_ID,       isSigner: false, isWritable: false }, // arcium_program
         { pubkey: tablePda,                isSigner: false, isWritable: true  }, // table
-        { pubkey: deckState,               isSigner: false, isWritable: false }, // deck_state (read-only)
+        { pubkey: deckState,               isSigner: false, isWritable: true  }, // deck_state
         { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }, // system_program
         // remaining_accounts: CrankTallyER for recording dealer action
         { pubkey: getCrankTallyErPda(tablePda), isSigner: false, isWritable: true },
@@ -6904,7 +6904,7 @@ class CrankService {
       const ix = new TransactionInstruction({ programId: PROGRAM_ID, keys, data });
       const ok = await sendWithRetry(conn, ix, this.teePayer, `[${tag}] arcium_showdown_queue`, 3, false, []);
       if (ok) {
-        console.log(`  ✅ [${tag}] arcium_showdown_queue queued MPC reveal_showdown (mask=${activeMask}, offset=${computationOffset})`);
+        console.log(`  ✅ [${tag}] arcium_showdown_queue queued MPC reveal_all_showdown (mask=${activeMask}, offset=${computationOffset})`);
       }
       return ok;
     } catch (e: any) {

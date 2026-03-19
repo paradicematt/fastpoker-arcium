@@ -26,7 +26,7 @@ use crate::ID as PROGRAM_ID;
 
 pub const COMP_DEF_OFFSET_SHUFFLE:  u32 = arcium_anchor::comp_def_offset("shuffle_and_deal");
 pub const COMP_DEF_OFFSET_REVEAL:   u32 = arcium_anchor::comp_def_offset("reveal_community");
-pub const COMP_DEF_OFFSET_SHOWDOWN: u32 = arcium_anchor::comp_def_offset("reveal_player_cards");
+pub const COMP_DEF_OFFSET_SHOWDOWN: u32 = arcium_anchor::comp_def_offset("reveal_all_showdown");
 
 // ── Circuit compiled sizes (from `wc -c build/*.arcis`) ──
 pub const CIRCUIT_LEN_SHUFFLE:  u32 = 12_752_912;
@@ -105,10 +105,11 @@ impl<'info> InitCompDefAccs<'info> for InitShuffleCompDef<'info> {
         ]
     }
     fn outputs(&self) -> Vec<Output> {
-        // 10 encrypted values: 1 Enc<Mxe,u64> community + 9 Enc<Shared,u16> player cards.
-        // MPC sends 10 × 32 = 320 bytes. Stride-3 layout covers Mxe + 2 full players.
-        // Players 2-8 SeatCards get zeroed — their cards revealed at showdown via MPC.
-        vec![Output::Ciphertext; 10]
+        // 11 encrypted values: 1 Enc<Mxe,u64> community + 1 Enc<Mxe,u128> packed holes + 9 Enc<Shared,u16>.
+        // MPC sends 11 × 32 = 352 bytes. Stride-3 layout:
+        //   Mxe community (slots 0-2) + Mxe packed_holes (slots 3-5) + P0 Shared (slots 6-8)
+        //   + P1 nonce+ct1 (slots 9-10). All 9 players' cards in MXE pack for showdown.
+        vec![Output::Ciphertext; 11]
     }
     fn comp_def_offset(&self) -> u32 { COMP_DEF_OFFSET_SHUFFLE }
     fn compiled_circuit_len(&self) -> u32 { CIRCUIT_LEN_SHUFFLE }
@@ -226,15 +227,17 @@ impl<'info> InitCompDefAccs<'info> for InitShowdownCompDef<'info> {
     fn lut_program(&self) -> AccountInfo<'info> { self.lut_program.to_account_info() }
     fn system_program(&self) -> AccountInfo<'info> { self.system_program.to_account_info() }
     fn params(&self) -> Vec<Parameter> {
-        // reveal_player_cards(packed: Enc<Shared, u16>) -> u16
-        // Enc<Shared> carries implicit Shared context: x25519_pubkey + nonce + ciphertext.
+        // reveal_all_showdown(packed_holes: Enc<Mxe, u128>, active_mask: u16)
+        // Enc<Mxe, u128> decomposes to: PlaintextU128 (nonce) + Ciphertext (ct)
         vec![
-            Parameter::ArcisX25519Pubkey, Parameter::PlaintextU128, Parameter::Ciphertext,
+            Parameter::PlaintextU128, // MXE nonce for packed_holes
+            Parameter::Ciphertext,    // packed_holes ciphertext (Rescue ct)
+            Parameter::PlaintextU16,  // active_mask bitmask
         ]
     }
     fn outputs(&self) -> Vec<Output> {
-        // 1 plaintext u16 packed card value (card1*256+card2)
-        vec![Output::PlaintextU16]
+        // 9 plaintext u16 packed card values (card1*256+card2 per player)
+        vec![Output::PlaintextU16; 9]
     }
     fn comp_def_offset(&self) -> u32 { COMP_DEF_OFFSET_SHOWDOWN }
     fn compiled_circuit_len(&self) -> u32 { CIRCUIT_LEN_SHOWDOWN }

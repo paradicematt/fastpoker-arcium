@@ -14,22 +14,15 @@ use crate::ID as PROGRAM_ID;
 
 /// shuffle_and_deal MPC callback — receives encrypted card outputs.
 ///
-/// Raw MPC output is GROUPED BY OWNER with interleaved nonces (NOT sequential CTs).
-/// Each Enc<Shared> owner group = [nonce(32, 16-byte LE zero-padded), ct1(32), ct2(32), ...]
-/// Single Enc<Mxe> with nonce=0 has only [ct(32)] (no nonce slot).
+/// Raw MPC output layout (11 outputs = 352 bytes, stride-3 per encrypted value):
+///   Slots 0-2:  Mxe community   [nonce, ct1, ct2]
+///   Slots 3-5:  Mxe packed_holes [nonce, ct1, ct2]  (u128, 7-bit packed 18 cards)
+///   Slots 6-8:  P0 Shared        [nonce, ct1, ct2]
+///   Slots 9-10: P1 Shared        [nonce, ct1]       (ct2 truncated but not needed)
 ///
-/// Layout for PACKED-COMMUNITY shuffle_and_deal (1 + 9*2 = 19 slots, 608 bytes full):
-///   slot[0]  = Mxe packed community ciphertext (Enc<Mxe, u64>: comm1*256^4+...+comm5)
-///   slot[1]  = Player 0 output nonce (input_nonce + 1, zero-padded to 32)
-///   slot[2]  = Player 0 packed hole card ciphertext (Enc<Shared, u16>)
-///   slot[3]  = Player 1 output nonce
-///   slot[4]  = Player 1 packed hole card ciphertext
-///   ...
-///   slot[17] = Player 8 output nonce
-///   slot[18] = Player 8 packed hole card ciphertext
-///
-/// SIZE=448 covers: slot[0] (community) + 6 full players (slots 1-12) + p6 nonce (slot 13).
-/// Sufficient for HU through 6-max.
+/// The MXE packed_holes contains ALL 9 players' hole cards. Stored in
+/// DeckState.encrypted_hole_cards[9..11] for reveal_all_showdown to decrypt.
+/// P0+P1 Shared outputs enable client-side card viewing for first 2 players.
 ///
 /// Packed u16 = card1 * 256 + card2. Client decrypts with shared secret + output nonce.
 
@@ -44,37 +37,41 @@ pub struct ShuffleAndDealOutput {
 
 impl HasSize for ShuffleAndDealOutput {
     // SIZE = bytes of raw MPC output in the callback IX data.
-    // Output count (10) must match encrypted return values in circuit. MPC sends count × 32 bytes.
+    // Output count (11) must match encrypted return values in circuit. MPC sends count × 32 bytes.
     // Each encrypted value uses stride=3 in the raw output: [nonce(32), ct1(32), ct2(32)].
-    // With 10 outputs = 320 bytes: Mxe(3 slots) + P0(3) + P1(3) + P2_nonce(1) = 2 full players.
-    // Players beyond slot 9 get zero SeatCards — their cards are revealed at showdown via MPC.
-    const SIZE: usize = 320;
+    // With 11 outputs = 352 bytes:
+    //   Mxe community (3) + Mxe packed_holes (3) + P0 Shared (3) + P1 nonce+ct1 (2) = 11 slots.
+    // All 9 players' cards in MXE pack. P0+P1 get client-side Shared decrypt.
+    const SIZE: usize = 352;
 }
 
-// Raw MPC output: 10 × 32-byte slots (SIZE=320).
+// Raw MPC output: 11 × 32-byte slots (SIZE=352).
 // Each Enc<T,V> output group = 3 slots: [nonce(32), ct1(32), ct2(32)].
-// With 10 outputs, stride-3 covers: Mxe(3)+P0(3)+P1(3)+P2_nonce(1) = 2 full players.
-// Players 2-8 get zeroed SeatCards — client-side decryption not available.
-// Their cards ARE still encrypted inside the MPC — revealed at showdown via reveal_player_cards.
+// With 11 outputs, stride-3 covers:
+//   Mxe community (slots 0-2) + Mxe packed_holes (slots 3-5)
+//   + P0 Shared (slots 6-8) + P1 nonce+ct1 (slots 9-10).
 // ct1 = primary ciphertext (the encrypted field element we need).
 // ct2 = second Rescue block (internal padding, not used for decryption).
 const SLOT_SIZE: usize = 32;
-// Layout (verified via SLOT diagnostic):
-// Slot  0: Mxe nonce  (value = 1)
-// Slot  1: Mxe ct1    (packed community ciphertext)
-// Slot  2: Mxe ct2    (unused Rescue block)
-// Slot  3: P0 nonce
-// Slot  4: P0 ct1     ← hole card ciphertext for decryption
-// Slot  5: P0 ct2     (unused)
-// Slot  6: P1 nonce
-// Slot  7: P1 ct1     ← hole card ciphertext
-// Slot  8: P1 ct2     (unused)
-// ... stride=3 per player ...
-// Slot 3+i*3: Pi nonce, Slot 4+i*3: Pi ct1, Slot 5+i*3: Pi ct2
-const MXE_CT_SLOT: usize = 1;        // packed community ct at slot 1
-const FIRST_PLAYER_SLOT: usize = 4;   // P0 ct1 at slot 4 (after Mxe group of 3)
-const PLAYER_STRIDE: usize = 3;       // nonce + ct1 + ct2 per player
-const TOTAL_OUTPUT_SIZE: usize = 320;  // 10 slots × 32 bytes (Mxe+P0+P1+partial P2)
+// Layout:
+// Slot  0: Mxe community nonce
+// Slot  1: Mxe community ct1    (packed community ciphertext)
+// Slot  2: Mxe community ct2    (unused Rescue block)
+// Slot  3: Mxe packed_holes nonce
+// Slot  4: Mxe packed_holes ct1  (u128: all 18 hole cards, 7-bit packed)
+// Slot  5: Mxe packed_holes ct2  (unused Rescue block)
+// Slot  6: P0 nonce
+// Slot  7: P0 ct1               ← hole card ciphertext for client decrypt
+// Slot  8: P0 ct2               (unused)
+// Slot  9: P1 nonce
+// Slot 10: P1 ct1               ← hole card ciphertext (no ct2 but not needed)
+const MXE_COMM_CT_SLOT: usize = 1;    // community ct at slot 1
+const MXE_HOLES_NONCE_SLOT: usize = 3; // packed_holes nonce at slot 3
+const MXE_HOLES_CT_SLOT: usize = 4;    // packed_holes ct1 at slot 4
+const MXE_HOLES_CT2_SLOT: usize = 5;   // packed_holes ct2 at slot 5
+const FIRST_PLAYER_SLOT: usize = 7;    // P0 ct1 at slot 7 (after 2 Mxe groups of 3)
+const PLAYER_STRIDE: usize = 3;        // nonce + ct1 + ct2 per player
+const TOTAL_OUTPUT_SIZE: usize = 352;   // 11 slots × 32 bytes
 
 #[derive(Accounts)]
 pub struct ShuffleAndDealCallback<'info> {
@@ -238,20 +235,22 @@ pub fn shuffle_and_deal_callback_handler(
         }
     }
 
-    // Write full MXE encrypted group to DeckState for reveal_community.
+    // Write MXE community encrypted group to DeckState for reveal_community.
     // MPC stride=3: slot 0 = nonce, slot 1 = ct1, slot 2 = ct2.
-    // The reveal_community circuit reads this via .account() and needs all 3 slots
-    // (96 bytes) to reconstruct Enc<Mxe, u64> for decryption.
-    // Store in encrypted_community[0..2]; slots 3-4 unused (zeroed).
-    deck_state.encrypted_community[0] = get_slot(&raw_bytes, 0);                      // MXE nonce
-    deck_state.encrypted_community[1] = get_slot(&raw_bytes, MXE_CT_SLOT * SLOT_SIZE); // MXE ct1
-    deck_state.encrypted_community[2] = get_slot(&raw_bytes, 2 * SLOT_SIZE);           // MXE ct2
+    deck_state.encrypted_community[0] = get_slot(&raw_bytes, 0);                           // comm nonce
+    deck_state.encrypted_community[1] = get_slot(&raw_bytes, MXE_COMM_CT_SLOT * SLOT_SIZE); // comm ct1
+    deck_state.encrypted_community[2] = get_slot(&raw_bytes, 2 * SLOT_SIZE);                // comm ct2
     for i in 3..5 {
         deck_state.encrypted_community[i] = [0u8; 32];
     }
-    // MXE-encrypted outputs have no per-output nonces — decrypted by MPC cluster key.
-    // Zero out community_nonces (not used for MXE decryption).
     deck_state.community_nonces = [[0u8; 16]; 5];
+
+    // Write MXE packed_holes encrypted group to DeckState for reveal_all_showdown.
+    // Stored in encrypted_hole_cards[9..11] (repurposing unused slots).
+    // This contains ALL 9 players' hole cards packed into a single Enc<Mxe, u128>.
+    deck_state.encrypted_hole_cards[9]  = get_slot(&raw_bytes, MXE_HOLES_NONCE_SLOT * SLOT_SIZE); // holes nonce
+    deck_state.encrypted_hole_cards[10] = get_slot(&raw_bytes, MXE_HOLES_CT_SLOT * SLOT_SIZE);    // holes ct1
+    deck_state.encrypted_hole_cards[11] = get_slot(&raw_bytes, MXE_HOLES_CT2_SLOT * SLOT_SIZE);   // holes ct2
 
     // Mark shuffle complete and transition to Preflop
     deck_state.shuffle_complete = true;

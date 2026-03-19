@@ -21,15 +21,14 @@ use crate::instructions::init_comp_defs::COMP_DEF_OFFSET_SHOWDOWN;
 use crate::instructions::arcium_deal::ArciumSignerAccount;
 use crate::ID as PROGRAM_ID;
 
-/// Queue MPC reveal_player_cards computation for a single player via Arcium.
-/// Called once per active (non-folded) player at showdown.
+/// Queue MPC reveal_all_showdown computation via Arcium.
+/// Single call reveals ALL active players' hole cards at once using the
+/// MXE-packed u128 stored in DeckState by the shuffle_and_deal callback.
 ///
-/// First call transitions Showdown → AwaitingShowdown.
-/// Subsequent calls for other seats stay in AwaitingShowdown.
-/// The callback writes each player's revealed hand to Table.revealed_hands.
-/// When the last active player's callback arrives, transitions → Showdown.
+/// Transitions Showdown → AwaitingShowdown. The callback writes all players'
+/// revealed hands to Table.revealed_hands and transitions back to Showdown.
 ///
-/// PERMISSIONLESS — anyone can call when phase is Showdown or AwaitingShowdown.
+/// PERMISSIONLESS — anyone can call when phase is Showdown.
 
 #[derive(Accounts)]
 #[instruction(computation_offset: u64)]
@@ -81,7 +80,7 @@ pub struct ArciumShowdownQueue<'info> {
         mut,
         seeds = [TABLE_SEED, table.table_id.as_ref()],
         bump = table.bump,
-        constraint = (table.phase == GamePhase::Showdown || table.phase == GamePhase::AwaitingShowdown) @ PokerError::InvalidActionForPhase,
+        constraint = table.phase == GamePhase::Showdown @ PokerError::InvalidActionForPhase,
     )]
     pub table: Account<'info, Table>,
 
@@ -134,67 +133,41 @@ impl<'info> QueueCompAccs<'info> for ArciumShowdownQueue<'info> {
 pub fn handler(
     ctx: Context<ArciumShowdownQueue>,
     computation_offset: u64,
-    seat_idx: u8,
 ) -> Result<()> {
+    let table = &ctx.accounts.table;
     let deck_state = &ctx.accounts.deck_state;
-    let table_key = ctx.accounts.table.key();
-    let max_p = ctx.accounts.table.max_players;
+    let table_key = table.key();
 
-    require!(seat_idx < max_p, PokerError::InvalidSeatNumber);
+    // Only allow from Showdown phase (single call, not per-player)
+    require!(table.phase == GamePhase::Showdown, PokerError::InvalidActionForPhase);
 
-    // Build MPC args for reveal_player_cards circuit:
-    // reveal_player_cards(packed: Enc<Shared, u16>) -> u16
+    // Build MPC args for reveal_all_showdown circuit:
+    // reveal_all_showdown(packed_holes: Enc<Mxe, u128>, active_mask: u16) -> (u16 × 9)
     //
-    // Args in ArgBuilder order (Enc<Shared> pattern):
-    //   .x25519_pubkey(pubkey)       — from DeckState.encrypted_hole_cards[seat_idx]
-    //   .plaintext_u128(output_nonce)— OUTPUT nonce from SeatCards offset 140 (= input_nonce + 1)
-    //   .encrypted_u16(ct_bytes)     — ciphertext read from SeatCards remaining_accounts[0]
-    //
-    // SeatCards layout: disc(8) + table(32) + seat_index(1) + player(32) + card1(1) + card2(1) + bump(1) = 76
-    // enc_card1(32) at offset 76, enc_card2(32) at offset 108, nonce(16) at offset 140
-    const ENC1_OFFSET: usize = 76;
-    const NONCE_OFFSET: usize = 140; // OUTPUT nonce written by deal callback (= input_nonce + 1)
+    // Args in ArgBuilder order (Enc<Mxe> pattern):
+    //   .plaintext_u128(mxe_nonce) — from DeckState.encrypted_hole_cards[9] (first 16 bytes)
+    //   .encrypted_u128(ct_bytes)  — from DeckState.encrypted_hole_cards[10] (ct1)
+    //   .plaintext_u16(active_mask)— seats_occupied & !seats_folded
+    let nonce_slot = deck_state.encrypted_hole_cards[9]; // 32-byte slot, nonce in first 16
+    let mxe_nonce = u128::from_le_bytes(nonce_slot[..16].try_into().unwrap());
+    let ct_bytes = deck_state.encrypted_hole_cards[10]; // 32-byte Rescue ciphertext
 
-    let i = seat_idx as usize;
-    let pubkey = deck_state.encrypted_hole_cards[i];
-
-    // Read ciphertext + OUTPUT nonce from SeatCards passed as remaining_accounts[0].
-    // CRITICAL: pass the OUTPUT nonce (input_nonce + 1), NOT the input nonce.
-    // reveal_community works because it reads the output nonce from encrypted_community[0].
-    // Same pattern here — the deal callback stored the output nonce at SeatCards offset 140.
-    require!(!ctx.remaining_accounts.is_empty(), PokerError::InvalidAccountCount);
-    let seat_cards_info = &ctx.remaining_accounts[0];
-    let seat_data = seat_cards_info.try_borrow_data()?;
-    require!(seat_data.len() >= NONCE_OFFSET + 16, PokerError::InvalidSeatCardsAccount);
-    let mut ct_bytes = [0u8; 32];
-    ct_bytes.copy_from_slice(&seat_data[ENC1_OFFSET..ENC1_OFFSET + 32]);
-    let mut nonce_bytes = [0u8; 16];
-    nonce_bytes.copy_from_slice(&seat_data[NONCE_OFFSET..NONCE_OFFSET + 16]);
-    let output_nonce = u128::from_le_bytes(nonce_bytes);
-    drop(seat_data);
+    let active_mask = table.seats_occupied & !table.seats_folded;
 
     let args = ArgBuilder::new()
-        .x25519_pubkey(pubkey)
-        .plaintext_u128(output_nonce)
-        .encrypted_u16(ct_bytes)
+        .plaintext_u128(mxe_nonce)
+        .encrypted_u128(ct_bytes)
+        .plaintext_u16(active_mask)
         .build();
 
-    // Build callback instruction pointing to reveal_player_cards_callback
-    let deck_state_key = ctx.accounts.deck_state.key();
+    // Build callback instruction pointing to reveal_showdown_callback
+    let deck_state_key = deck_state.key();
 
     // Anchor discriminator = SHA256("global:reveal_showdown_callback")[0..8]
-    // seat_idx is passed via DeckState.showdown_reveal_seats (not in discriminator,
-    // because Arcium comp account serialization fails with >8 byte discriminators)
     let callback_disc: Vec<u8> = vec![0xa7, 0xe8, 0xca, 0x3b, 0x69, 0xf3, 0x73, 0xd3];
 
-    // Derive SeatCards PDA for this seat — callback writes plaintext cards here
-    // so settle_hand can read them from SeatCards offsets 73-74.
-    let (seat_cards_pda, _) = Pubkey::find_program_address(
-        &[SEAT_CARDS_SEED, table_key.as_ref(), &[seat_idx]],
-        &PROGRAM_ID,
-    );
-
-    let cb_accounts = vec![
+    // Callback accounts — no per-player SeatCards needed, all data goes to Table.revealed_hands
+    let mut cb_accounts = vec![
         CallbackAccount { pubkey: ARCIUM_PROG_ID, is_writable: false },
         CallbackAccount { pubkey: ctx.accounts.comp_def_account.key(), is_writable: false },
         CallbackAccount { pubkey: ctx.accounts.mxe_account.key(), is_writable: false },
@@ -203,9 +176,19 @@ pub fn handler(
         CallbackAccount { pubkey: anchor_lang::solana_program::sysvar::instructions::ID, is_writable: false },
         CallbackAccount { pubkey: table_key, is_writable: true },
         CallbackAccount { pubkey: deck_state_key, is_writable: true },
-        // SeatCards for this seat — callback writes plaintext card1/card2 here
-        CallbackAccount { pubkey: seat_cards_pda, is_writable: true },
     ];
+
+    // Add SeatCards PDAs for all occupied seats — callback writes plaintext cards to them
+    // so settle_hand can read them from SeatCards offsets 73-74.
+    for i in 0..table.max_players {
+        if table.seats_occupied & (1 << i) != 0 {
+            let (seat_cards_pda, _) = Pubkey::find_program_address(
+                &[SEAT_CARDS_SEED, table_key.as_ref(), &[i]],
+                &PROGRAM_ID,
+            );
+            cb_accounts.push(CallbackAccount { pubkey: seat_cards_pda, is_writable: true });
+        }
+    }
 
     let callbacks = vec![CallbackInstruction {
         program_id: PROGRAM_ID,
@@ -223,25 +206,9 @@ pub fn handler(
         0,  // cu_price_micro
     )?;
 
-    // Record seat_idx in DeckState for the callback to read
-    {
-        let deck_state = &mut ctx.accounts.deck_state;
-        let q = deck_state.showdown_reveals_queued as usize;
-        require!(q < 9, PokerError::InvalidSeatNumber);
-        deck_state.showdown_reveal_seats[q] = seat_idx;
-        deck_state.showdown_reveals_queued += 1;
-    }
-
-    // Transition Showdown → AwaitingShowdown on first call; set expected count
+    // Transition Showdown → AwaitingShowdown
     let table = &mut ctx.accounts.table;
-    if table.phase == GamePhase::Showdown {
-        table.phase = GamePhase::AwaitingShowdown;
-        let active_mask = table.seats_occupied & !table.seats_folded;
-        let active_count = active_mask.count_ones() as u8;
-        let deck_state = &mut ctx.accounts.deck_state;
-        deck_state.showdown_reveals_expected = active_count;
-        deck_state.showdown_reveals_done = 0;
-    }
+    table.phase = GamePhase::AwaitingShowdown;
     table.action_nonce = table.action_nonce.wrapping_add(1);
 
     // Record crank action for MPC queue payer
@@ -250,8 +217,8 @@ pub fn handler(
     try_record_crank_action(ctx.remaining_accounts, &tkey, &ckey, table.hand_number);
 
     msg!(
-        "Queued MPC reveal_player_cards: hand #{}, seat={}, offset={}",
-        table.hand_number, seat_idx, computation_offset
+        "Queued MPC reveal_all_showdown: hand #{}, active_mask={:#06x}, offset={}",
+        table.hand_number, active_mask, computation_offset
     );
 
     Ok(())

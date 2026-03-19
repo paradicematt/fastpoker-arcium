@@ -428,18 +428,18 @@ pub mod fastpoker {
         instructions::arcium_reveal::reveal_community_callback_handler(ctx, output)
     }
 
-    /// Queue MPC reveal_player_cards computation for a single seat via Arcium.
-    /// Called once per active player at showdown. First call transitions Showdown → AwaitingShowdown.
+    /// Queue MPC reveal_all_showdown computation via Arcium.
+    /// Single call reveals ALL active players' hole cards from MXE-packed u128.
+    /// Transitions Showdown → AwaitingShowdown. Callback transitions back.
     pub fn arcium_showdown_queue(
         ctx: Context<ArciumShowdownQueue>,
         computation_offset: u64,
-        seat_idx: u8,
     ) -> Result<()> {
-        instructions::arcium_showdown_queue::handler(ctx, computation_offset, seat_idx)
+        instructions::arcium_showdown_queue::handler(ctx, computation_offset)
     }
 
-    /// Callback: MPC reveal_player_cards result — writes one player's plaintext hole cards.
-    /// Called by Arcium MPC cluster per-player. When all active reveals done → Showdown.
+    /// Callback: MPC reveal_all_showdown result — writes all players' plaintext hole cards.
+    /// Called ONCE by Arcium MPC cluster. Transitions AwaitingShowdown → Showdown.
     pub fn reveal_showdown_callback<'info>(
         ctx: Context<'_, '_, 'info, 'info, RevealShowdownCallback<'info>>,
         output: arcium_anchor::SignedComputationOutputs<instructions::arcium_showdown::RevealShowdownOutput>,

@@ -6,7 +6,7 @@ const PROG = new PublicKey('BGyLYzzS5tPASGSj6BbzpLbHVwm4Csg9C1QfD8KGDe3N');
 async function main() {
   const c = new Connection('http://localhost:8899', 'confirmed');
   
-  const circuits = ['shuffle_and_deal', 'reveal_community', 'reveal_showdown'];
+  const circuits = ['shuffle_and_deal', 'reveal_community', 'reveal_all_showdown'];
   
   for (const name of circuits) {
     const offsetBuf = getCompDefAccOffset(name);
