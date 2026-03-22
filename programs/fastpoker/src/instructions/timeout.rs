@@ -105,7 +105,10 @@ pub fn handler(ctx: Context<HandleTimeout>, expected_nonce: u16) -> Result<()> {
     if fold_count >= MAX_AUTO_FOLDS && !table.is_sit_and_go() && !is_leaving {
         seat.status = SeatStatus::SittingOut;
         seat.sit_out_timestamp = clock.unix_timestamp;
-        msg!("💤 Seat {} sat out after {} consecutive auto-folds (cash game)", timed_out_seat, fold_count);
+        // CRITICAL: Also fold from the current hand so advance_action
+        // doesn't treat this SittingOut player as still active (zombie).
+        table.seats_folded |= 1 << seat.seat_number;
+        msg!("💤 Seat {} sat out + folded after {} consecutive auto-folds (cash game)", timed_out_seat, fold_count);
     }
 
     // Reuse the same advance_action logic as normal fold/check

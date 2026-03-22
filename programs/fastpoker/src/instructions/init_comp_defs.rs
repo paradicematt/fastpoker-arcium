@@ -1,14 +1,12 @@
 use anchor_lang::prelude::*;
 use arcium_anchor::{
     init_comp_def, LUT_PROGRAM_ID,
-    COMP_DEF_PDA_SEED, MXE_PDA_SEED,
     traits::InitCompDefAccs,
 };
 use arcium_client::idl::arcium::{
     accounts::MXEAccount,
     program::Arcium,
     types::{Output, Parameter},
-    ID_CONST as ARCIUM_PROG_ID,
 };
 
 use crate::ID as PROGRAM_ID;

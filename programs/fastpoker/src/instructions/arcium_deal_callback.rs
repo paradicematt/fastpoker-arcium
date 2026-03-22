@@ -308,5 +308,15 @@ pub fn shuffle_and_deal_callback_handler(
         deck_state.hand_number,
     );
 
+    // Emit verification event — computation_offset uniquely identifies this MPC deal
+    // on the Arcium network. Anyone can verify the deal was honest.
+    let num_players = table.seats_occupied.count_ones() as u8;
+    emit!(crate::events::ArciumDealVerified {
+        table: table.key(),
+        hand_number: deck_state.hand_number,
+        computation_offset: deck_state.computation_offset,
+        num_players,
+    });
+
     Ok(())
 }

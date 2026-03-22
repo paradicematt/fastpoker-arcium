@@ -148,8 +148,13 @@ pub fn handler(
             is_all_in: status == 3,
             // Leaving (6) is only folded if they're in the seats_folded bitmask.
             // All-in players who called LeaveCashGame stay pot-eligible.
+            // Leaving (6): folded UNLESS they are all-in (pot-eligible).
+            // Use seats_allin (not seats_folded) because Leaving players who left
+            // during Waiting phase are NOT in seats_folded for the current hand.
+            // Active (1) with 0 total_bet: mid-hand joiner who never posted blinds.
             is_folded: status == 2 || status == 4 || status == 5
-                || (status == 6 && (table.seats_folded & (1u16 << seat_num)) != 0), // Leaving+folded = dead money; Leaving+allin = pot-eligible
+                || (status == 6 && (table.seats_allin & (1u16 << seat_num)) == 0)
+                || (status == 1 && total_bet == 0),
         });
     }
     

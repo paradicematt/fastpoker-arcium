@@ -3820,8 +3820,8 @@ class CrankService {
         if (gameType === 3) return true;
         return false;
       case Phase.Starting: return true;
-      case Phase.AwaitingDeal: return true;  // MPC callback may need retry/timeout
-      case Phase.AwaitingShowdown: return true; // MPC callback may need retry/timeout
+      case Phase.AwaitingDeal: return false;  // MPC callback is MXE nodes' job — crank can't help
+      case Phase.AwaitingShowdown: return false; // MPC callback is MXE nodes' job — crank can't help
       case Phase.FlopRevealPending: return true;
       case Phase.TurnRevealPending: return true;
       case Phase.RiverRevealPending: return true;
@@ -6748,6 +6748,8 @@ class CrankService {
       const ok = await sendWithRetry(conn, ix, this.teePayer, `[${tag}] arcium_deal`, 3, false, []);
       if (ok) {
         console.log(`  ✅ [${tag}] arcium_deal queued MPC shuffle_and_deal (offset=${computationOffset})`);
+        // Suppress sweep retries while MPC is processing (up to 5 min for first deal)
+        this.startGameCooldown.set(tablePda.toBase58(), Date.now() + 300_000);
       }
       return ok;
     } catch (e: any) {

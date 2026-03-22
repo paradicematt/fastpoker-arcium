@@ -33,13 +33,13 @@ pub struct ResetSngTable<'info> {
     )]
     pub table: Account<'info, Table>,
 
-    /// Vault PDA — used to verify all crank rewards have been distributed.
-    /// Guard: crank_pool_accumulated must equal vault.total_crank_distributed.
-    /// This ensures crank operators are paid before the table can be reused.
+    /// Vault PDA — verified by seeds. Crank reward check removed for SNG reset:
+    /// SNG crank pools are tiny (micro-stakes) and distribute_crank_rewards often
+    /// skips when the amount rounds to 0. The handler zeros crank_pool_accumulated
+    /// on reset so the next tournament starts clean.
     #[account(
         seeds = [VAULT_SEED, table.key().as_ref()],
         bump = vault.bump,
-        constraint = table.crank_pool_accumulated <= vault.total_crank_distributed @ PokerError::UndistributedRakeExists,
     )]
     pub vault: Account<'info, TableVault>,
 }
@@ -162,6 +162,7 @@ pub fn handler<'info>(
     table.prize_pool = 0;
     table.entry_fees_escrowed = 0;
     table.prizes_distributed = false;
+    table.crank_pool_accumulated = 0; // Zero for next tournament (SNG crank rewards are best-effort)
     table.eliminated_count = 0;
     table.eliminated_seats = [0; 9];
     table.seats_occupied = 0;

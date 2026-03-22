@@ -179,7 +179,8 @@ function cardToString(c: number): string {
 function suitColor(c: number): string {
   if (c === 255 || c < 0 || c > 51) return 'text-gray-500';
   const suit = Math.floor(c / 13);
-  return suit === 1 || suit === 2 ? 'text-red-400' : 'text-gray-300';
+  // 0=♠ black, 1=♥ red, 2=♦ red, 3=♣ black
+  return suit === 1 || suit === 2 ? 'text-red-500' : 'text-white';
 }
 
 // ─── Phase colors ───

@@ -226,3 +226,23 @@ pub struct PrizesDistributed {
     pub prize_pool: u64,
     pub payouts: Vec<crate::instructions::distribute_prizes::PrizeEntry>,
 }
+
+/// Emitted when the MPC shuffle_and_deal callback completes.
+/// The computation_offset uniquely identifies the Arcium MPC computation
+/// and can be used to verify the deal was honest via the Arcium program.
+#[event]
+pub struct ArciumDealVerified {
+    pub table: Pubkey,
+    pub hand_number: u64,
+    pub computation_offset: u64,
+    pub num_players: u8,
+}
+
+/// Emitted when the MPC reveal_all_showdown callback completes.
+/// The computation_offset can be used to verify showdown card reveals.
+#[event]
+pub struct ArciumShowdownVerified {
+    pub table: Pubkey,
+    pub hand_number: u64,
+    pub computation_offset: u64,
+}

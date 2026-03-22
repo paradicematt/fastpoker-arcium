@@ -136,5 +136,12 @@ pub fn reveal_showdown_callback_handler(
     table.action_nonce = table.action_nonce.wrapping_add(1);
     msg!("All showdown reveals done — phase→Showdown");
 
+    // Emit verification event — computation_offset identifies this MPC showdown
+    emit!(crate::events::ArciumShowdownVerified {
+        table: table.key(),
+        hand_number: ctx.accounts.deck_state.hand_number,
+        computation_offset: ctx.accounts.deck_state.computation_offset,
+    });
+
     Ok(())
 }

@@ -33,35 +33,30 @@ pub struct StartGame<'info> {
 fn validate_remaining_seat_accounts(
     table_key: &Pubkey,
     max_players: u8,
-    seat_accounts: &[AccountInfo],
-    expected_mask: u16,
+    accounts: &[AccountInfo],
+    _expected_mask: u16, // Accept any valid seats for self-heal
 ) -> Result<u16> {
-    let expected_count = expected_mask.count_ones() as usize;
-    require!(seat_accounts.len() == expected_count, PokerError::InvalidAccountCount);
-
     let mut seen_mask: u16 = 0;
     let seat_num_offset: usize = 226;
-    let mut idx = 0usize;
 
-    for expected_seat_num in 0..max_players {
-        if expected_mask & (1u16 << expected_seat_num) == 0 {
-            continue;
+    for seat_info in accounts.iter() {
+        // Stop at first non-seat account (CrankTallyER, TipJar, etc.)
+        // Seats are owned by this program and have PlayerSeat::SIZE
+        if seat_info.owner != &crate::ID {
+            break;
+        }
+        let data = seat_info.try_borrow_data()?;
+        if data.len() < PlayerSeat::SIZE {
+            break; // Not a seat account (CrankTally=197, TipJar=67, Seat=256+)
         }
 
-        let seat_info = &seat_accounts[idx];
-        // Must be writable account owned by this program.
         require!(seat_info.is_writable, PokerError::InvalidAccountData);
-        require!(seat_info.owner == &crate::ID, PokerError::InvalidAccountData);
-
-        let data = seat_info.try_borrow_data()?;
-        // PlayerSeat account size check (PlayerSeat::SIZE includes discriminator)
-        require!(data.len() >= PlayerSeat::SIZE, PokerError::InvalidAccountData);
 
         let seat_num = data[seat_num_offset];
-        require!(seat_num == expected_seat_num, PokerError::InvalidAccountData);
+        require!(seat_num < max_players, PokerError::InvalidAccountData);
 
         let (expected_seat_pda, _) = Pubkey::find_program_address(
-            &[SEAT_SEED, table_key.as_ref(), &[expected_seat_num]],
+            &[SEAT_SEED, table_key.as_ref(), &[seat_num]],
             &crate::ID,
         );
         require_keys_eq!(seat_info.key(), expected_seat_pda, PokerError::SeatNotAtTable);
@@ -69,7 +64,6 @@ fn validate_remaining_seat_accounts(
         let bit = 1u16 << seat_num;
         require!((seen_mask & bit) == 0, PokerError::InvalidAccountCount);
         seen_mask |= bit;
-        idx += 1;
     }
 
     Ok(seen_mask)
@@ -85,21 +79,27 @@ pub fn handler(ctx: Context<StartGame>) -> Result<()> {
     // Existence guaranteed by init_table_seat + delegation.
     // Extra accounts (CrankTallyER, TipJar) are safely skipped by seat loops
     // because their account size (197, 67) is < seat_num_offset (226).
-    let expected_mask = table.seats_occupied;
-    let expected_count = expected_mask.count_ones() as usize;
+    let stored_mask = table.seats_occupied;
     let is_sng = table.is_sit_and_go();
-    require!(
-        ctx.remaining_accounts.len() >= expected_count,
-        PokerError::InvalidAccountCount
-    );
-    let seat_accounts = &ctx.remaining_accounts[..expected_count];
+    // Accept any valid seats (0xFFFF) for self-heal — don't require exact match.
+    // The crank sends all seats it knows about; we rebuild the real mask from on-chain data.
     let provided_mask = validate_remaining_seat_accounts(
         &table_key,
         table.max_players,
-        seat_accounts,
-        expected_mask,
+        ctx.remaining_accounts,
+        0xFFFF,
     )?;
-    require!(provided_mask == expected_mask, PokerError::InvalidAccountCount);
+    // Self-heal: rebuild seats_occupied from actual seat data.
+    // Fixes drift from settle/leave/clear_leaving_seat race conditions.
+    if provided_mask != stored_mask {
+        msg!("seats_occupied drift: stored=0b{:06b} -> actual=0b{:06b}", stored_mask, provided_mask);
+        table.seats_occupied = provided_mask;
+    }
+    let recalc = provided_mask.count_ones() as u8;
+    if table.current_players != recalc {
+        msg!("current_players drift: {} -> {} (from seats_occupied)", table.current_players, recalc);
+        table.current_players = recalc;
+    }
 
     // Start requirements differ by mode:
     // - Cash: 2+ players can start
@@ -186,48 +186,11 @@ pub fn handler(ctx: Context<StartGame>) -> Result<()> {
         }
     }
 
-    // === Auto-activate waiting_for_bb players for cash games ===
-    // When table is on L1 in Waiting phase, all SittingOut+waiting_for_bb seats should become Active.
-    // This prevents dead states where all joiners are stuck in SittingOut.
+    // NOTE: Auto-activate waiting_for_bb was deliberately removed (TEE OPEN-4).
+    // It let timed-out players bypass missed blind charges on sit-in.
+    // Players must use sit_in instruction to properly post missed blinds.
     let status_offset: usize = 227;
-    // waiting_for_bb offset: 8+32+32+32+8+8+8+64+32+2+1+1+8+1+1+1 = 239
-    let waiting_for_bb_offset: usize = 239;
     let is_cash = table.game_type == GameType::CashGame;
-    
-    if is_cash && !ctx.remaining_accounts.is_empty() {
-        // Count current active players BEFORE auto-activate
-        let mut pre_active = 0u8;
-        for seat_info in ctx.remaining_accounts.iter() {
-            if let Ok(data) = seat_info.try_borrow_data() {
-                if data.len() > status_offset {
-                    let status = data[status_offset];
-                    if status == 1 || status == 3 { // Active or AllIn
-                        pre_active += 1;
-                    }
-                }
-            }
-        }
-        // Only auto-activate waiting_for_bb players if needed to prevent deadlock
-        // (fewer than 2 active players). Otherwise they must properly post missed
-        // blinds via sit_in instruction — auto-activating everyone bypasses that.
-        if pre_active < 2 {
-            for seat_info in ctx.remaining_accounts.iter() {
-                if let Ok(mut data) = seat_info.try_borrow_mut_data() {
-                    if data.len() > waiting_for_bb_offset {
-                        let status = data[status_offset];
-                        let waiting = data[waiting_for_bb_offset];
-                        // SittingOut (4) + waiting_for_bb (1=true) → activate
-                        if status == 4 && waiting == 1 {
-                            let sn = data[seat_num_offset];
-                            data[status_offset] = 1; // Active
-                            data[waiting_for_bb_offset] = 0; // Clear waiting_for_bb
-                            msg!("Auto-activated seat {} (deadlock prevention, was SittingOut+waiting_for_bb)", sn);
-                        }
-                    }
-                }
-            }
-        }
-    }
 
     // === Cash game: increment sit-out counters for SittingOut players ===
     // deal_vrf only receives seat_cards PDAs (not seat PDAs), so it can't track this.
@@ -291,22 +254,29 @@ pub fn handler(ctx: Context<StartGame>) -> Result<()> {
         }
     }
 
-    // === A3 fix: Auto-sitout 0-chip Active players in cash games ===
+    // === A3 fix: Auto-sitout 0-chip Active/AllIn players in cash games ===
     // Without this, a busted player stays Active → gets dealt in → posts 0 blind → degenerate hand.
+    // Also catches AllIn players who busted — they should not stay in AllIn state with 0 chips.
     // SNG has its own bust reconciliation above; cash games need this separate check.
     if is_cash && !ctx.remaining_accounts.is_empty() {
+        let sit_out_ts_offset: usize = 242; // sit_out_timestamp (i64, 8 bytes)
         for seat_info in ctx.remaining_accounts.iter() {
             if let Ok(mut data) = seat_info.try_borrow_mut_data() {
                 if data.len() > status_offset && chips_offset + 8 <= data.len() {
                     let status = data[status_offset];
-                    // Active (1) with 0 chips → force SittingOut
-                    if status == 1 {
+                    // Active (1) or AllIn (3) with 0 chips → force SittingOut
+                    if status == 1 || status == 3 {
                         let chips = u64::from_le_bytes(
                             data[chips_offset..chips_offset + 8].try_into().unwrap_or([0; 8])
                         );
                         if chips == 0 {
                             let sn = data[seat_num_offset];
                             data[status_offset] = 4; // SittingOut
+                            // Set sit_out_timestamp for crank kick timer
+                            if sit_out_ts_offset + 8 <= data.len() {
+                                let ts = clock.unix_timestamp.to_le_bytes();
+                                data[sit_out_ts_offset..sit_out_ts_offset + 8].copy_from_slice(&ts);
+                            }
                             // A6: mark missed blinds so sit_in charges them on return
                             let missed_sb_off: usize = 236;
                             let missed_bb_off: usize = 237;
@@ -314,7 +284,7 @@ pub fn handler(ctx: Context<StartGame>) -> Result<()> {
                                 data[missed_sb_off] = 1;
                                 data[missed_bb_off] = 1;
                             }
-                            msg!("A3: Seat {} auto-sat-out (0 chips, cash game)", sn);
+                            msg!("A3: Seat {} auto-sat-out (0 chips, was status {}, cash game)", sn, status);
                         }
                     }
                 }
@@ -417,7 +387,39 @@ pub fn handler(ctx: Context<StartGame>) -> Result<()> {
     table.big_blind_seat = bb_seat;
     
     msg!("Blind positions set (active_mask={:#06x}): SB={}, BB={}", active_mask, sb_seat, bb_seat);
-    
+
+    // === OPEN-2 fix: Mark missed blinds for SittingOut players ===
+    // Find natural blind positions using ALL occupied seats (not just active).
+    // If a SittingOut player is at the natural SB/BB position, mark them as missed.
+    if is_cash && !ctx.remaining_accounts.is_empty() {
+        let natural_sb = table.next_seat_in_mask(dealer_button, table.seats_occupied)
+            .unwrap_or(sb_seat);
+        let natural_bb = table.next_seat_in_mask(natural_sb, table.seats_occupied)
+            .unwrap_or(bb_seat);
+
+        let missed_sb_off: usize = 236;
+        let missed_bb_off: usize = 237;
+
+        for seat_info in ctx.remaining_accounts.iter() {
+            if let Ok(mut data) = seat_info.try_borrow_mut_data() {
+                if data.len() > missed_bb_off {
+                    let sn = data[seat_num_offset];
+                    let status = data[status_offset];
+                    if status == 4 { // SittingOut
+                        if sn == natural_sb {
+                            data[missed_sb_off] = 1;
+                            msg!("Seat {} missed SB (sitting out)", sn);
+                        }
+                        if sn == natural_bb {
+                            data[missed_bb_off] = 1;
+                            msg!("Seat {} missed BB (sitting out)", sn);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // === POST BLINDS from remaining_accounts ===
     // Find correct remaining_account by seat_number (not by index — seats may be sparse)
     if !ctx.remaining_accounts.is_empty() {
@@ -548,7 +550,7 @@ pub fn handler(ctx: Context<StartGame>) -> Result<()> {
     // === Dealer Service: record action + deduct tip ===
     // Optional CrankTallyER and TipJar may be appended after seat accounts.
     // Validated by PDA seeds — if wrong accounts are passed, they're silently skipped.
-    let extra_start = expected_count;
+    let extra_start = provided_mask.count_ones() as usize;
     let extras = &ctx.remaining_accounts[extra_start..];
     let caller_key = ctx.accounts.initiator.key();
 
