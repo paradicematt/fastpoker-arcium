@@ -1,0 +1,213 @@
+{
+  "timestamp": "2026-03-22T06:39:42.888Z",
+  "rpcUrl": "http://127.0.0.1:8899",
+  "handsPlayed": 3,
+  "hands": [
+    {
+      "handNumber": 1,
+      "wallClockMs": 16342,
+      "mpcLatencyMs": 12016,
+      "txCount": 13,
+      "totalFeeLamports": 65006,
+      "totalCU": 619474,
+      "txBreakdown": [
+        {
+          "label": "hand1:Call P1 (Preflop)",
+          "fee": 5000,
+          "cu": 14385
+        },
+        {
+          "label": "hand1:Fold P2 (fallback)",
+          "fee": 5000,
+          "cu": 14275
+        },
+        {
+          "label": "hand1:crank",
+          "fee": 5002,
+          "cu": 51981
+        },
+        {
+          "label": "hand1:crank",
+          "fee": 5000,
+          "cu": 9760
+        },
+        {
+          "label": "hand1:crank",
+          "fee": 5000,
+          "cu": 24297
+        },
+        {
+          "label": "hand1:crank",
+          "fee": 5000,
+          "cu": 24297
+        },
+        {
+          "label": "hand1:crank",
+          "fee": 5000,
+          "cu": 24297
+        },
+        {
+          "label": "hand1:crank",
+          "fee": 5000,
+          "cu": 103073
+        },
+        {
+          "label": "hand1:crank",
+          "fee": 5002,
+          "cu": 122544
+        },
+        {
+          "label": "hand1:crank",
+          "fee": 5002,
+          "cu": 47208
+        },
+        {
+          "label": "hand1:crank",
+          "fee": 5000,
+          "cu": 65551
+        },
+        {
+          "label": "hand1:crank",
+          "fee": 5000,
+          "cu": 96857
+        },
+        {
+          "label": "hand1:crank",
+          "fee": 5000,
+          "cu": 20949
+        }
+      ]
+    },
+    {
+      "handNumber": 2,
+      "wallClockMs": 23517,
+      "mpcLatencyMs": 19337,
+      "txCount": 10,
+      "totalFeeLamports": 50006,
+      "totalCU": 433330,
+      "txBreakdown": [
+        {
+          "label": "hand2:Call P2 (Preflop)",
+          "fee": 5000,
+          "cu": 14385
+        },
+        {
+          "label": "hand2:Fold P1 (fallback)",
+          "fee": 5000,
+          "cu": 14275
+        },
+        {
+          "label": "hand2:crank",
+          "fee": 5002,
+          "cu": 51991
+        },
+        {
+          "label": "hand2:crank",
+          "fee": 5000,
+          "cu": 9760
+        },
+        {
+          "label": "hand2:crank",
+          "fee": 5000,
+          "cu": 24297
+        },
+        {
+          "label": "hand2:crank",
+          "fee": 5000,
+          "cu": 24297
+        },
+        {
+          "label": "hand2:crank",
+          "fee": 5000,
+          "cu": 24297
+        },
+        {
+          "label": "hand2:crank",
+          "fee": 5000,
+          "cu": 103025
+        },
+        {
+          "label": "hand2:crank",
+          "fee": 5002,
+          "cu": 119827
+        },
+        {
+          "label": "hand2:crank",
+          "fee": 5002,
+          "cu": 47176
+        }
+      ]
+    },
+    {
+      "handNumber": 3,
+      "wallClockMs": 22302,
+      "mpcLatencyMs": 18027,
+      "txCount": 10,
+      "totalFeeLamports": 50006,
+      "totalCU": 433192,
+      "txBreakdown": [
+        {
+          "label": "hand3:Call P1 (Preflop)",
+          "fee": 5000,
+          "cu": 14385
+        },
+        {
+          "label": "hand3:Fold P2 (fallback)",
+          "fee": 5000,
+          "cu": 14275
+        },
+        {
+          "label": "hand3:crank",
+          "fee": 5002,
+          "cu": 51981
+        },
+        {
+          "label": "hand3:crank",
+          "fee": 5000,
+          "cu": 9760
+        },
+        {
+          "label": "hand3:crank",
+          "fee": 5000,
+          "cu": 24297
+        },
+        {
+          "label": "hand3:crank",
+          "fee": 5000,
+          "cu": 24297
+        },
+        {
+          "label": "hand3:crank",
+          "fee": 5000,
+          "cu": 24297
+        },
+        {
+          "label": "hand3:crank",
+          "fee": 5000,
+          "cu": 103119
+        },
+        {
+          "label": "hand3:crank",
+          "fee": 5002,
+          "cu": 119605
+        },
+        {
+          "label": "hand3:crank",
+          "fee": 5002,
+          "cu": 47176
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "avgCostLamports": 55006,
+    "avgCostSOL": 0.000055006,
+    "avgCostUSD": 0.0082509,
+    "avgMpcLatencyMs": 16460,
+    "avgTxCount": 11,
+    "avgCU": 495332,
+    "maxCostLamports": 65006,
+    "minCostLamports": 0,
+    "erThresholdExceeded": false
+  }
+}

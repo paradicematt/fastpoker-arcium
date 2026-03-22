@@ -89,9 +89,13 @@ async function main() {
   console.log(`  Treasury funded`);
 
   // ── 1. Create POKER mint ──
+  // Mint authority = Pool PDA so Steel's claim_refined can mint tokens.
+  // Using admin.publicKey (random keypair) loses the authority after bootstrap.
   console.log('\n  === Creating POKER Mint ===');
-  const pokerMint = await createMint(conn, admin, admin.publicKey, null, 9);
+  const poolPdaForMint = getPool();
+  const pokerMint = await createMint(conn, admin, poolPdaForMint, null, 9);
   console.log(`  POKER Mint: ${pokerMint.toBase58()}`);
+  console.log(`  Mint authority: Pool PDA ${poolPdaForMint.toBase58().slice(0, 12)}..`);
 
   // ── 2. Initialize Steel Pool ──
   console.log('\n  === Initializing Steel Pool ===');
@@ -124,6 +128,60 @@ async function main() {
   }), [admin], 'init_dealer_registry');
   console.log('  ✓ Dealer registry initialized');
 
+  // ── 3b. Register CrankOperator + purchase Dealer License for localnet crank ──
+  console.log('\n  === Registering Crank Operator + Dealer License ===');
+  const crankKeyPath = path.join(__dirname, '.localnet-keypair.json');
+  if (fs.existsSync(crankKeyPath)) {
+    const crankKp = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(fs.readFileSync(crankKeyPath, 'utf-8'))));
+    // Fund crank payer if needed
+    const crankBal = await conn.getBalance(crankKp.publicKey);
+    if (crankBal < 2 * LAMPORTS_PER_SOL) {
+      await conn.confirmTransaction(await conn.requestAirdrop(crankKp.publicKey, 5 * LAMPORTS_PER_SOL), 'confirmed');
+    }
+
+    // Register CrankOperator PDA (seeds: ["crank", authority])
+    const crankOpPda = pda([Buffer.from('crank'), crankKp.publicKey.toBuffer()], ANCHOR_PROGRAM_ID);
+    const opExists = await conn.getAccountInfo(crankOpPda);
+    if (!opExists) {
+      await send(conn, new TransactionInstruction({
+        programId: ANCHOR_PROGRAM_ID,
+        keys: [
+          { pubkey: crankKp.publicKey, isSigner: true, isWritable: true },
+          { pubkey: crankOpPda, isSigner: false, isWritable: true },
+          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+        ],
+        data: disc('register_crank_operator'),
+      }), [crankKp], 'register_crank_operator');
+      console.log(`  ✓ CrankOperator: ${crankOpPda.toBase58().slice(0, 12)}..`);
+    } else {
+      console.log(`  ✓ CrankOperator already exists`);
+    }
+
+    // Purchase Dealer License (bonding curve — first license is cheapest)
+    const dealerLicPda = pda([Buffer.from('dealer_license'), crankKp.publicKey.toBuffer()], ANCHOR_PROGRAM_ID);
+    const licExists = await conn.getAccountInfo(dealerLicPda);
+    if (!licExists) {
+      await send(conn, new TransactionInstruction({
+        programId: ANCHOR_PROGRAM_ID,
+        keys: [
+          { pubkey: crankKp.publicKey, isSigner: true, isWritable: true },   // buyer
+          { pubkey: crankKp.publicKey, isSigner: false, isWritable: false },  // beneficiary
+          { pubkey: getDealerReg(), isSigner: false, isWritable: true },      // registry
+          { pubkey: dealerLicPda, isSigner: false, isWritable: true },        // license PDA
+          { pubkey: TREASURY, isSigner: false, isWritable: true },            // treasury
+          { pubkey: poolPda, isSigner: false, isWritable: true },             // staker_pool
+          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+        ],
+        data: disc('purchase_dealer_license'),
+      }), [crankKp], 'purchase_dealer_license');
+      console.log(`  ✓ DealerLicense: ${dealerLicPda.toBase58().slice(0, 12)}..`);
+    } else {
+      console.log(`  ✓ DealerLicense already exists`);
+    }
+  } else {
+    console.log('  ⚠ .localnet-keypair.json not found — skipping crank operator setup');
+  }
+
   // ── 4. Register + fund E2E test wallets ──
   console.log('\n  === Registering E2E Test Wallets ===');
   for (let i = 0; i < 4; i++) {
@@ -155,13 +213,14 @@ async function main() {
       }), [w], `register_player_${i}`);
     }
 
-    // Mint POKER tokens
+    // Note: POKER tokens are earned via SNG wins (unrefined → claim_refined mints SPL tokens).
+    // Pool PDA is mint authority, so direct mintTo from admin is not possible.
+    // Create ATA for when player claims refined POKER later.
     try {
-      const ata = await getOrCreateAssociatedTokenAccount(conn, admin, pokerMint, w.publicKey);
-      await mintTo(conn, admin, pokerMint, ata.address, admin, 1_000_000_000_000n); // 1000 POKER
-      console.log(`  ✓ Wallet ${i} (${w.publicKey.toBase58().slice(0, 8)}..) registered + 1000 POKER`);
+      await getOrCreateAssociatedTokenAccount(conn, admin, pokerMint, w.publicKey);
+      console.log(`  ✓ Wallet ${i} (${w.publicKey.toBase58().slice(0, 8)}..) registered + ATA created`);
     } catch (e: any) {
-      console.log(`  ⚠ Wallet ${i} POKER mint failed: ${e.message?.slice(0, 80)}`);
+      console.log(`  ⚠ Wallet ${i} ATA creation failed: ${e.message?.slice(0, 80)}`);
     }
   }
 

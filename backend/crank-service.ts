@@ -36,6 +36,7 @@ import {
   TOKEN_PROGRAM_ID as SPL_TOKEN_PROGRAM_ID,
 } from '@solana/spl-token';
 import * as fs from 'fs';
+import * as path from 'path';
 import * as crypto from 'crypto';
 import bs58 from 'bs58';
 import { L1Stream, L1AccountUpdate } from './l1-stream';
@@ -669,6 +670,7 @@ interface TableState {
   isDelegated:    boolean;
   tokenMint:      PublicKey;
   actionNonce:    number;
+  revealedHands:  number[];
 }
 
 function parseTable(data: Buffer): TableState {
@@ -692,6 +694,7 @@ function parseTable(data: Buffer): TableState {
     actionNonce:    data.length >= OFF.ACTION_NONCE + 2
                       ? data.readUInt16LE(OFF.ACTION_NONCE)
                       : 0,
+    revealedHands:  Array.from(data.slice(OFF.REVEALED_HANDS, OFF.REVEALED_HANDS + 18)),
   };
 }
 
@@ -1817,10 +1820,11 @@ function buildRecordPokerRakeIx(
 
 const DEFAULT_TX_CU_LIMIT = 1_300_000;
 const DEFAULT_TX_CU_PRICE_MICROLAMPORTS = 1;
-const CRANK_METRICS_PATH = process.env.CRANK_METRICS_PATH || 'j:/Poker-Arc/backend/crank-metrics.json';
-const CRANK_HEARTBEAT_PATH = process.env.CRANK_HEARTBEAT_PATH || 'j:/Poker-Arc/backend/crank-heartbeat.json';
-const CRANK_CONTROL_PATH = process.env.CRANK_CONTROL_PATH || 'j:/Poker-Arc/backend/crank-control.json';
-const CRANK_CONFIG_PATH = process.env.CRANK_CONFIG_PATH || 'j:/Poker-Arc/backend/crank-config.json';
+const BACKEND_DIR = path.resolve(__dirname);
+const CRANK_METRICS_PATH = process.env.CRANK_METRICS_PATH || path.join(BACKEND_DIR, 'crank-metrics.json');
+const CRANK_HEARTBEAT_PATH = process.env.CRANK_HEARTBEAT_PATH || path.join(BACKEND_DIR, 'crank-heartbeat.json');
+const CRANK_CONTROL_PATH = process.env.CRANK_CONTROL_PATH || path.join(BACKEND_DIR, 'crank-control.json');
+const CRANK_CONFIG_PATH = process.env.CRANK_CONFIG_PATH || path.join(BACKEND_DIR, 'crank-config.json');
 
 // ─── Crank Config (hot-reloadable) ───
 interface CrankConfig {
@@ -1884,7 +1888,7 @@ const DEFAULT_CRANK_CONFIG: CrankConfig = {
   l1_payer_keypair_path: '',
   pool_authority_keypair_path: '',
   state_cache_enabled: true,
-  state_cache_path: 'j:/Poker-Arc/backend/table-state-cache.json',
+  state_cache_path: path.join(BACKEND_DIR, 'table-state-cache.json'),
   state_cache_include_seats: true,
   laserstream_enabled: false,
   laserstream_api_key: '',
@@ -2538,13 +2542,13 @@ class CrankService {
 
     // IMPORTANT: Never use deployer/super-admin key here. Crank has ZERO admin privileges.
     const keypairFallbacks = [
-      // Poker-Arc localnet paths (LOCAL_MODE)
-      'j:/Poker-Arc/backend/.localnet-keypair.json',
-      'j:/Poker-Arc/backend/crank-keypair.json',
-      // Legacy Poker paths
-      'j:/Poker/contracts/auth/deployers/crank-keypair.json',
-      'j:/Poker/backend/crank-keypair.json',
-      'j:/Poker/tests/authority-keypair.json',
+      // Poker-Arc localnet paths (LOCAL_MODE) — use __dirname for WSL compat
+      path.join(BACKEND_DIR, '.localnet-keypair.json'),
+      path.join(BACKEND_DIR, 'crank-keypair.json'),
+      // Legacy Poker paths (cross-project, kept for backwards compat)
+      '/mnt/j/Poker/contracts/auth/deployers/crank-keypair.json',
+      '/mnt/j/Poker/backend/crank-keypair.json',
+      '/mnt/j/Poker/tests/authority-keypair.json',
     ];
 
     const payerPath = resolveKeypairPath(
@@ -3920,9 +3924,13 @@ class CrankService {
       // ─── SHOWDOWN → arcium_showdown_queue (MPC) or settle_hand ───
       case Phase.Showdown: {
         // Reveal hole cards via MPC before settling.
+        // Skip MPC reveal for fold-wins (only 1 active player — no cards to compare).
+        const activeMask = state.seatsOccupied & ~state.seatsFolded & 0x1FF;
+        const activeCount = activeMask.toString(2).split('').filter(c => c === '1').length;
+
         // Check if cards are already revealed (callback already ran).
         // revealedHands[0] === 255 means not yet revealed (CARD_NOT_DEALT).
-        if ((state as any).revealedHands && (state as any).revealedHands[0] === 255) {
+        if (activeCount >= 2 && state.revealedHands && state.revealedHands[0] === 255) {
           return this.crankArciumShowdown(tablePda, state);
         }
         let occ = state.seatsOccupied;
@@ -5269,28 +5277,21 @@ class CrankService {
         if (this.blockedTables.has(key)) continue;
         if (this.isTableFiltered(key)) continue;
 
-        // Check if already delegated
-        const tableRecord = delegationRecordPdaFromDelegatedAccount(tablePda);
-        const existingRecord = await this.l1.getAccountInfo(tableRecord).catch(() => null);
-        if (existingRecord) continue; // Already delegated — will be found by normal discovery
-
+        // Arcium architecture: all tables stay on L1, no TEE delegation needed.
+        // Just add to tracking — the crank loop handles start_game + arcium_deal.
         console.log(
-          `\n🚀 L1 SNG promotion: ${key.slice(0, 12)}... (${curP}/${maxP} players, type=${gameType}, hand#=${handNum})`,
+          `\n🚀 L1 SNG discovered: ${key.slice(0, 12)}... (${curP}/${maxP} players, type=${gameType}, hand#=${handNum})`,
         );
 
-        this.processing.add(key);
-        try {
-          const ok = await this.promoteSngTableToTee(tablePda, maxP, data);
-          if (ok) {
-            console.log(`  ✅ Table ${key.slice(0, 12)}... promoted to TEE — crank will start game`);
-          } else {
-            console.log(`  ⚠️  Table ${key.slice(0, 12)}... promotion failed`);
-          }
-        } catch (e: any) {
-          console.warn(`  ❌ Promote failed: ${e?.message?.slice(0, 100)}`);
-        } finally {
-          this.processing.delete(key);
-        }
+        const state = parseTable(data);
+        this.tablePhases.set(key, {
+          phase: state.phase,
+          handNumber: state.handNumber,
+          currentPlayers: state.currentPlayers,
+          lastPollAt: Date.now(),
+        });
+        console.log(`  ✅ Table ${key.slice(0, 12)}... added to Arcium crank tracking`);
+        void this.enqueueCrank(tablePda, state);
       }
     } catch (e: any) {
       if (!e?.message?.includes('429')) {

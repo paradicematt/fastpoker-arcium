@@ -1,0 +1,60 @@
+{
+  "pid": 15080,
+  "startedAt": 1774196683592,
+  "heartbeat": 1774198000846,
+  "status": "running",
+  "tablesTracked": 10,
+  "tablesProcessing": 1,
+  "recentErrors": [],
+  "uptime": "0h 21m",
+  "dealerStats": {
+    "operatorPubkey": "33Z8DzAyzymY4nf4UNKsibjt4vXsLsU5FZcM1wFfnRZd",
+    "lifetimeActions": 117,
+    "lifetimeSolEarned": 45000000,
+    "lifetimeTokenEarned": 0,
+    "registeredAt": 1774189993,
+    "lastRefreshed": 1774197990852
+  },
+  "dealMode": "arcium",
+  "config": {
+    "process_cashouts": true,
+    "auto_kick": true,
+    "rake_sweep": true,
+    "auction_sweep": true,
+    "timeout_enabled": true,
+    "crank_sng": true,
+    "crank_cash": false,
+    "removal_sweep_interval": 30000,
+    "rake_sweep_interval": 60000,
+    "timeout_ms": 20000,
+    "tee_rpc": "https://tee.magicblock.app",
+    "l1_rpc": "https://devnet.helius-rpc.com/?api-key=0a2b697e-8118-455d-8c52-a498ec2d81df",
+    "table_filter_mode": "none",
+    "table_whitelist": [
+      "91CWq3KwVHvrdkg9B5UiQRtrKPrcwtkwDNts44wsTVDJ"
+    ],
+    "table_blacklist": [
+      "HGbdSKaX1g2HZJWmxTMzMP4ZncZ2VYkNhh1cxmERR5Ev",
+      "EEb2Mj9E1ANLb4Qo8pFFfPHgKRRNQtzEi3HSRQY5Sp35",
+      "5mpyRepi8hmp2t14no4YrgDKg6qBmi44C4udba1XtFBU",
+      "44wLJB6R7iNCKF3YUUco3PLZMB8NX7nZCoNhhZ6m1dNB",
+      "6qu4cpBdEC3v9kuNnuTeoJsSwDSDzFFVhzLWiR7t81Vf",
+      "H5oWKZPir9mCDqppggUmi4EFuWDsGQw9GBk5Mdtf8i7T",
+      "GmQiY26fasvhF76g8uQJmkiXceRwfd5SfDJTn9FCCGsW",
+      "36xHC35uQzAoDdczi8TSio9h4eU9aU8tpv8jAiv3VHeQ",
+      "5F528pNvT6yRdFL726jZogvS2VDUj9cFnGjb4xJdc7XF"
+    ],
+    "crank_keypair_path": "",
+    "l1_payer_keypair_path": "",
+    "pool_authority_keypair_path": "",
+    "state_cache_enabled": false,
+    "state_cache_path": "/mnt/j/Poker-Arc/backend/table-state-cache.json",
+    "state_cache_include_seats": true,
+    "laserstream_enabled": true,
+    "laserstream_api_key": "0a2b697e-8118-455d-8c52-a498ec2d81df",
+    "laserstream_endpoint": "https://laserstream-devnet-ewr.helius-rpc.com",
+    "priority_fee_microlamports": 0,
+    "arcium_compute_units": 500000,
+    "validators": []
+  }
+}

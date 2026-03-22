@@ -1,0 +1,464 @@
+{
+  "updatedAt": 1774198001310,
+  "totals": {
+    "erCranks": 0,
+    "l1Cranks": 451,
+    "totalCranks": 451,
+    "erCostLamports": 0,
+    "l1CostLamports": 2255892,
+    "totalCostLamports": 2255892,
+    "totalSuccess": 451,
+    "totalFailed": 3588,
+    "simSaved": 10758
+  },
+  "byLabel": {
+    "[2J4H2W6u] create_permissions (batch 1)": {
+      "chain": "L1",
+      "count": 0,
+      "costLamports": 0,
+      "successCount": 0,
+      "failCount": 1
+    },
+    "[2J4H2W6u] delegate_table+ds_permissions": {
+      "chain": "L1",
+      "count": 0,
+      "costLamports": 0,
+      "successCount": 0,
+      "failCount": 1
+    },
+    "[2J4H2W6u] delegate_seat_perm[0]": {
+      "chain": "L1",
+      "count": 0,
+      "costLamports": 0,
+      "successCount": 0,
+      "failCount": 1
+    },
+    "[2J4H2W6u] delegate_seat_perm[1]": {
+      "chain": "L1",
+      "count": 0,
+      "costLamports": 0,
+      "successCount": 0,
+      "failCount": 1
+    },
+    "[2J4H2W6u] delegate_table": {
+      "chain": "L1",
+      "count": 0,
+      "costLamports": 0,
+      "successCount": 0,
+      "failCount": 1
+    },
+    "[2J4H2W6u] delegate_deck_state": {
+      "chain": "L1",
+      "count": 0,
+      "costLamports": 0,
+      "successCount": 0,
+      "failCount": 1
+    },
+    "[2J4H2W6u] delegate_crank_tally_er": {
+      "chain": "L1",
+      "count": 0,
+      "costLamports": 0,
+      "successCount": 0,
+      "failCount": 1
+    },
+    "[2J4H2W6u] delegate_seat[0]": {
+      "chain": "L1",
+      "count": 0,
+      "costLamports": 0,
+      "successCount": 0,
+      "failCount": 1
+    },
+    "[2J4H2W6u] delegate_seat_cards[0]": {
+      "chain": "L1",
+      "count": 0,
+      "costLamports": 0,
+      "successCount": 0,
+      "failCount": 1
+    },
+    "[2J4H2W6u] delegate_seat[1]": {
+      "chain": "L1",
+      "count": 0,
+      "costLamports": 0,
+      "successCount": 0,
+      "failCount": 1
+    },
+    "[2J4H2W6u] delegate_seat_cards[1]": {
+      "chain": "L1",
+      "count": 0,
+      "costLamports": 0,
+      "successCount": 0,
+      "failCount": 1
+    },
+    "[2J4H2W6u] start_game": {
+      "chain": "L1",
+      "count": 1,
+      "costLamports": 5002,
+      "successCount": 1,
+      "failCount": 0
+    },
+    "[2J4H2W6u] arcium_deal": {
+      "chain": "L1",
+      "count": 1,
+      "costLamports": 5002,
+      "successCount": 1,
+      "failCount": 0
+    },
+    "[2J4H2W6u] arcium_reveal_queue": {
+      "chain": "L1",
+      "count": 3,
+      "costLamports": 15006,
+      "successCount": 3,
+      "failCount": 0
+    },
+    "[AcwiKzH4] start_game": {
+      "chain": "L1",
+      "count": 1,
+      "costLamports": 5002,
+      "successCount": 1,
+      "failCount": 0
+    },
+    "[AcwiKzH4] arcium_deal": {
+      "chain": "L1",
+      "count": 1,
+      "costLamports": 5002,
+      "successCount": 1,
+      "failCount": 0
+    },
+    "[AcwiKzH4] arcium_reveal_queue": {
+      "chain": "L1",
+      "count": 3,
+      "costLamports": 15006,
+      "successCount": 3,
+      "failCount": 0
+    },
+    "[AcwiKzH4] arcium_showdown_queue": {
+      "chain": "L1",
+      "count": 1,
+      "costLamports": 5002,
+      "successCount": 1,
+      "failCount": 0
+    },
+    "[2J4H2W6u] arcium_showdown_queue": {
+      "chain": "L1",
+      "count": 1,
+      "costLamports": 5002,
+      "successCount": 1,
+      "failCount": 0
+    },
+    "[2J4H2W6u] settle_hand": {
+      "chain": "L1",
+      "count": 1,
+      "costLamports": 5002,
+      "successCount": 1,
+      "failCount": 0
+    },
+    "[AcwiKzH4] settle_hand": {
+      "chain": "L1",
+      "count": 1,
+      "costLamports": 5002,
+      "successCount": 1,
+      "failCount": 0
+    },
+    "[3E1wYzja] start_game": {
+      "chain": "L1",
+      "count": 1,
+      "costLamports": 5002,
+      "successCount": 1,
+      "failCount": 0
+    },
+    "[3E1wYzja] arcium_deal": {
+      "chain": "L1",
+      "count": 1,
+      "costLamports": 5002,
+      "successCount": 1,
+      "failCount": 0
+    },
+    "distribute_prizes (L1)": {
+      "chain": "L1",
+      "count": 8,
+      "costLamports": 40016,
+      "successCount": 8,
+      "failCount": 0
+    },
+    "reset_sng_table": {
+      "chain": "L1",
+      "count": 5,
+      "costLamports": 25010,
+      "successCount": 5,
+      "failCount": 3577
+    },
+    "[3E1wYzja] arcium_reveal_queue": {
+      "chain": "L1",
+      "count": 3,
+      "costLamports": 15006,
+      "successCount": 3,
+      "failCount": 0
+    },
+    "[3E1wYzja] arcium_showdown_queue": {
+      "chain": "L1",
+      "count": 1,
+      "costLamports": 5002,
+      "successCount": 1,
+      "failCount": 0
+    },
+    "[3E1wYzja] settle_hand": {
+      "chain": "L1",
+      "count": 1,
+      "costLamports": 5002,
+      "successCount": 1,
+      "failCount": 0
+    },
+    "[CNG8d5o7] start_game": {
+      "chain": "L1",
+      "count": 1,
+      "costLamports": 5002,
+      "successCount": 1,
+      "failCount": 0
+    },
+    "[CNG8d5o7] arcium_deal": {
+      "chain": "L1",
+      "count": 1,
+      "costLamports": 5002,
+      "successCount": 1,
+      "failCount": 0
+    },
+    "[CNG8d5o7] arcium_reveal_queue": {
+      "chain": "L1",
+      "count": 3,
+      "costLamports": 15006,
+      "successCount": 3,
+      "failCount": 0
+    },
+    "[CNG8d5o7] arcium_showdown_queue": {
+      "chain": "L1",
+      "count": 1,
+      "costLamports": 5002,
+      "successCount": 1,
+      "failCount": 0
+    },
+    "[CNG8d5o7] settle_hand": {
+      "chain": "L1",
+      "count": 1,
+      "costLamports": 5002,
+      "successCount": 1,
+      "failCount": 0
+    },
+    "[2FERWU3G] start_game": {
+      "chain": "L1",
+      "count": 1,
+      "costLamports": 5002,
+      "successCount": 1,
+      "failCount": 0
+    },
+    "[2FERWU3G] arcium_deal": {
+      "chain": "L1",
+      "count": 1,
+      "costLamports": 5002,
+      "successCount": 1,
+      "failCount": 0
+    },
+    "[2FERWU3G] arcium_reveal_queue": {
+      "chain": "L1",
+      "count": 3,
+      "costLamports": 15006,
+      "successCount": 3,
+      "failCount": 0
+    },
+    "[2FERWU3G] arcium_showdown_queue": {
+      "chain": "L1",
+      "count": 1,
+      "costLamports": 5002,
+      "successCount": 1,
+      "failCount": 0
+    },
+    "[2FERWU3G] settle_hand": {
+      "chain": "L1",
+      "count": 1,
+      "costLamports": 5002,
+      "successCount": 1,
+      "failCount": 0
+    },
+    "distribute_crank_rewards": {
+      "chain": "L1",
+      "count": 5,
+      "costLamports": 25000,
+      "successCount": 5,
+      "failCount": 0
+    },
+    "[GBETDSiu] start_game": {
+      "chain": "L1",
+      "count": 11,
+      "costLamports": 55022,
+      "successCount": 11,
+      "failCount": 0
+    },
+    "[9yZT4bji] start_game": {
+      "chain": "L1",
+      "count": 11,
+      "costLamports": 55022,
+      "successCount": 11,
+      "failCount": 0
+    },
+    "[GBETDSiu] arcium_deal": {
+      "chain": "L1",
+      "count": 11,
+      "costLamports": 55022,
+      "successCount": 11,
+      "failCount": 0
+    },
+    "[9yZT4bji] arcium_deal": {
+      "chain": "L1",
+      "count": 11,
+      "costLamports": 55022,
+      "successCount": 11,
+      "failCount": 0
+    },
+    "[9i8FsKE2] start_game": {
+      "chain": "L1",
+      "count": 38,
+      "costLamports": 190076,
+      "successCount": 38,
+      "failCount": 0
+    },
+    "[Ec6RXLu8] start_game": {
+      "chain": "L1",
+      "count": 37,
+      "costLamports": 185074,
+      "successCount": 37,
+      "failCount": 0
+    },
+    "[9i8FsKE2] arcium_deal": {
+      "chain": "L1",
+      "count": 37,
+      "costLamports": 185074,
+      "successCount": 37,
+      "failCount": 0
+    },
+    "[Ec6RXLu8] arcium_deal": {
+      "chain": "L1",
+      "count": 37,
+      "costLamports": 185074,
+      "successCount": 37,
+      "failCount": 0
+    },
+    "[9yZT4bji] handle_timeout": {
+      "chain": "L1",
+      "count": 11,
+      "costLamports": 55022,
+      "successCount": 11,
+      "failCount": 0
+    },
+    "[GBETDSiu] handle_timeout": {
+      "chain": "L1",
+      "count": 11,
+      "costLamports": 55022,
+      "successCount": 11,
+      "failCount": 0
+    },
+    "[9i8FsKE2] handle_timeout": {
+      "chain": "L1",
+      "count": 37,
+      "costLamports": 185074,
+      "successCount": 37,
+      "failCount": 0
+    },
+    "[Ec6RXLu8] handle_timeout": {
+      "chain": "L1",
+      "count": 36,
+      "costLamports": 180072,
+      "successCount": 36,
+      "failCount": 0
+    },
+    "[9i8FsKE2] settle_hand": {
+      "chain": "L1",
+      "count": 37,
+      "costLamports": 185074,
+      "successCount": 37,
+      "failCount": 0
+    },
+    "[Ec6RXLu8] settle_hand": {
+      "chain": "L1",
+      "count": 36,
+      "costLamports": 180072,
+      "successCount": 36,
+      "failCount": 0
+    },
+    "[9yZT4bji] settle_hand": {
+      "chain": "L1",
+      "count": 11,
+      "costLamports": 55022,
+      "successCount": 11,
+      "failCount": 0
+    },
+    "[GBETDSiu] settle_hand": {
+      "chain": "L1",
+      "count": 11,
+      "costLamports": 55022,
+      "successCount": 11,
+      "failCount": 0
+    },
+    "[3EipXpYd] start_game": {
+      "chain": "L1",
+      "count": 1,
+      "costLamports": 5002,
+      "successCount": 1,
+      "failCount": 0
+    },
+    "[3EipXpYd] arcium_deal": {
+      "chain": "L1",
+      "count": 1,
+      "costLamports": 5002,
+      "successCount": 1,
+      "failCount": 0
+    },
+    "[3EipXpYd] arcium_reveal_queue": {
+      "chain": "L1",
+      "count": 3,
+      "costLamports": 15006,
+      "successCount": 3,
+      "failCount": 0
+    },
+    "[3EipXpYd] arcium_showdown_queue": {
+      "chain": "L1",
+      "count": 1,
+      "costLamports": 5002,
+      "successCount": 1,
+      "failCount": 0
+    },
+    "[3EipXpYd] settle_hand": {
+      "chain": "L1",
+      "count": 1,
+      "costLamports": 5002,
+      "successCount": 1,
+      "failCount": 0
+    },
+    "[9yZT4bji] arcium_reveal_queue": {
+      "chain": "L1",
+      "count": 3,
+      "costLamports": 15006,
+      "successCount": 3,
+      "failCount": 0
+    },
+    "[GBETDSiu] arcium_reveal_queue": {
+      "chain": "L1",
+      "count": 3,
+      "costLamports": 15006,
+      "successCount": 3,
+      "failCount": 0
+    },
+    "[GBETDSiu] arcium_showdown_queue": {
+      "chain": "L1",
+      "count": 1,
+      "costLamports": 5002,
+      "successCount": 1,
+      "failCount": 0
+    },
+    "[9yZT4bji] arcium_showdown_queue": {
+      "chain": "L1",
+      "count": 1,
+      "costLamports": 5002,
+      "successCount": 1,
+      "failCount": 0
+    }
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"cd J:\\\\Poker-Arc\\\\backend && npx ts-node --transpile-only test-register.ts 2>&1\",\"timeout\":30000,\"description\":\"Test registration flow from CLI\"}",
+  "error": "Exit code 1\n/usr/bin/bash: line 1: cd: J:Poker-Arcbackend: No such file or directory",
+  "timestamp": "2026-03-22T16:37:09.203Z",
+  "retry_count": 2
+}

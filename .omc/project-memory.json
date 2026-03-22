@@ -239,27 +239,303 @@
   },
   "hotPaths": [
     {
+      "path": "backend\\crank-service.ts",
+      "accessCount": 75,
+      "lastAccessed": 1774195986451,
+      "type": "file"
+    },
+    {
+      "path": "client\\src\\app\\api\\admin\\status\\route.ts",
+      "accessCount": 13,
+      "lastAccessed": 1774197772672,
+      "type": "file"
+    },
+    {
+      "path": "client\\src\\app\\admin\\page.tsx",
+      "accessCount": 10,
+      "lastAccessed": 1774197317063,
+      "type": "file"
+    },
+    {
+      "path": "client\\src",
+      "accessCount": 9,
+      "lastAccessed": 1774197769243,
+      "type": "directory"
+    },
+    {
+      "path": "backend\\localnet-bootstrap.ts",
+      "accessCount": 8,
+      "lastAccessed": 1774191471868,
+      "type": "file"
+    },
+    {
+      "path": "",
+      "accessCount": 8,
+      "lastAccessed": 1774197769807,
+      "type": "directory"
+    },
+    {
+      "path": "backend\\e2e-sng-arcium.ts",
+      "accessCount": 7,
+      "lastAccessed": 1774190161621,
+      "type": "file"
+    },
+    {
+      "path": "backend\\stress-test-crank.ts",
+      "accessCount": 6,
+      "lastAccessed": 1774163805958,
+      "type": "file"
+    },
+    {
+      "path": "programs\\fastpoker\\src",
+      "accessCount": 4,
+      "lastAccessed": 1774191136241,
+      "type": "directory"
+    },
+    {
+      "path": "programs\\fastpoker\\src\\constants.rs",
+      "accessCount": 4,
+      "lastAccessed": 1774191351555,
+      "type": "directory"
+    },
+    {
+      "path": "client\\src\\lib\\constants.ts",
+      "accessCount": 4,
+      "lastAccessed": 1774197370557,
+      "type": "file"
+    },
+    {
+      "path": "programs\\fastpoker\\src\\state\\table.rs",
+      "accessCount": 3,
+      "lastAccessed": 1774162039638,
+      "type": "file"
+    },
+    {
+      "path": "contracts\\api\\src",
+      "accessCount": 3,
+      "lastAccessed": 1774167206395,
+      "type": "directory"
+    },
+    {
+      "path": "docs\\TODO.md",
+      "accessCount": 3,
+      "lastAccessed": 1774197758871,
+      "type": "file"
+    },
+    {
+      "path": "backend",
+      "accessCount": 3,
+      "lastAccessed": 1774197764494,
+      "type": "directory"
+    },
+    {
+      "path": "client\\src\\app\\api\\admin\\crank\\route.ts",
+      "accessCount": 3,
+      "lastAccessed": 1774197772827,
+      "type": "file"
+    },
+    {
+      "path": "client\\src\\app\\api\\admin\\seats\\route.ts",
+      "accessCount": 3,
+      "lastAccessed": 1774197818073,
+      "type": "file"
+    },
+    {
+      "path": "client\\src\\app\\api\\admin\\crank-config\\route.ts",
+      "accessCount": 3,
+      "lastAccessed": 1774197819559,
+      "type": "file"
+    },
+    {
+      "path": "programs\\fastpoker\\src\\state\\seat.rs",
+      "accessCount": 2,
+      "lastAccessed": 1774162034640,
+      "type": "file"
+    },
+    {
+      "path": "programs\\fastpoker\\src\\errors.rs",
+      "accessCount": 2,
+      "lastAccessed": 1774165711632,
+      "type": "directory"
+    },
+    {
+      "path": "contracts\\program\\src\\lib.rs",
+      "accessCount": 2,
+      "lastAccessed": 1774166745613,
+      "type": "file"
+    },
+    {
+      "path": "contracts",
+      "accessCount": 2,
+      "lastAccessed": 1774166762332,
+      "type": "directory"
+    },
+    {
+      "path": "Anchor.toml",
+      "accessCount": 2,
+      "lastAccessed": 1774167339668,
+      "type": "file"
+    },
+    {
+      "path": "programs\\fastpoker\\src\\instructions\\register.rs",
+      "accessCount": 2,
+      "lastAccessed": 1774197370228,
+      "type": "file"
+    },
+    {
+      "path": "client\\src\\app\\api\\tables\\list\\route.ts",
+      "accessCount": 2,
+      "lastAccessed": 1774197819239,
+      "type": "file"
+    },
+    {
       "path": "C:\\Users\\Below0\\.claude\\projects\\J--Poker-Arc\\memory",
       "accessCount": 1,
       "lastAccessed": 1774160879622,
       "type": "directory"
     },
     {
-      "path": "docs\\TODO.md",
-      "accessCount": 1,
-      "lastAccessed": 1774160884876,
-      "type": "file"
-    },
-    {
-      "path": "Anchor.toml",
-      "accessCount": 1,
-      "lastAccessed": 1774160886156,
-      "type": "file"
-    },
-    {
       "path": "Arcium.toml",
       "accessCount": 1,
       "lastAccessed": 1774160886286,
+      "type": "file"
+    },
+    {
+      "path": "package.json",
+      "accessCount": 1,
+      "lastAccessed": 1774161194441,
+      "type": "file"
+    },
+    {
+      "path": "C:\\Users\\Below0\\.claude\\projects\\J--Poker-Arc\\memory\\project_dual_versions.md",
+      "accessCount": 1,
+      "lastAccessed": 1774161281002,
+      "type": "file"
+    },
+    {
+      "path": "C:\\Users\\Below0\\.claude\\projects\\J--Poker-Arc\\memory\\project_arcium_localnet.md",
+      "accessCount": 1,
+      "lastAccessed": 1774161287741,
+      "type": "file"
+    },
+    {
+      "path": "C:\\Users\\Below0\\.claude\\projects\\J--Poker-Arc\\memory\\MEMORY.md",
+      "accessCount": 1,
+      "lastAccessed": 1774161292310,
+      "type": "file"
+    },
+    {
+      "path": "client\\src\\app\\game\\[id]\\page.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1774161831436,
+      "type": "file"
+    },
+    {
+      "path": "client\\src\\components\\game\\PokerTable.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1774161832198,
+      "type": "file"
+    },
+    {
+      "path": "client\\src\\hooks\\useArciumCards.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774161832717,
+      "type": "file"
+    },
+    {
+      "path": "client\\src\\components\\game\\Card.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1774161832957,
+      "type": "file"
+    },
+    {
+      "path": "client\\src\\app\\admin",
+      "accessCount": 1,
+      "lastAccessed": 1774161981353,
+      "type": "directory"
+    },
+    {
+      "path": "programs\\fastpoker\\src\\state\\table_vault.rs",
+      "accessCount": 1,
+      "lastAccessed": 1774162040164,
+      "type": "file"
+    },
+    {
+      "path": "client\\src\\components\\admin\\CrankDashboard.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1774163507446,
+      "type": "file"
+    },
+    {
+      "path": "contracts\\program\\src\\credit_unrefined_from_program.rs",
+      "accessCount": 1,
+      "lastAccessed": 1774166256299,
+      "type": "file"
+    },
+    {
+      "path": "contracts\\api\\src\\consts.rs",
+      "accessCount": 1,
+      "lastAccessed": 1774166268422,
+      "type": "file"
+    },
+    {
+      "path": "contracts\\program\\src\\claim_refined.rs",
+      "accessCount": 1,
+      "lastAccessed": 1774167194359,
+      "type": "file"
+    },
+    {
+      "path": "contracts\\program\\src\\burn_stake.rs",
+      "accessCount": 1,
+      "lastAccessed": 1774167194701,
+      "type": "file"
+    },
+    {
+      "path": "contracts\\program\\src\\claim_stake_rewards.rs",
+      "accessCount": 1,
+      "lastAccessed": 1774167194797,
+      "type": "file"
+    },
+    {
+      "path": "contracts\\program\\src\\transfer_mint_authority.rs",
+      "accessCount": 1,
+      "lastAccessed": 1774167243089,
+      "type": "file"
+    },
+    {
+      "path": "client\\e2e\\.localnet-state.json",
+      "accessCount": 1,
+      "lastAccessed": 1774167331183,
+      "type": "file"
+    },
+    {
+      "path": "contracts\\program\\src\\initialize.rs",
+      "accessCount": 1,
+      "lastAccessed": 1774167374429,
+      "type": "file"
+    },
+    {
+      "path": "scripts",
+      "accessCount": 1,
+      "lastAccessed": 1774187573899,
+      "type": "directory"
+    },
+    {
+      "path": "docs\\STARTUP-GUIDE.md",
+      "accessCount": 1,
+      "lastAccessed": 1774187579133,
+      "type": "file"
+    },
+    {
+      "path": "programs\\fastpoker\\src\\instructions\\reset_sng_table.rs",
+      "accessCount": 1,
+      "lastAccessed": 1774190881337,
+      "type": "file"
+    },
+    {
+      "path": "programs\\fastpoker\\src\\instructions\\register_crank_operator.rs",
+      "accessCount": 1,
+      "lastAccessed": 1774191059622,
       "type": "file"
     }
   ],
