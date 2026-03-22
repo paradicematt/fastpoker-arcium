@@ -613,8 +613,8 @@ export default function PokerTable({
   const callAmountRaw = Math.max(currentBet - (myPlayer?.bet || 0), 0);
   const callAmount = Math.min(callAmountRaw, myPlayer?.chips || 0);
   const minRaise = Math.max(currentBet + blinds.big, blinds.big);
-  const cardsDealt = phase !== 'Waiting';
-  const isShowdown = phase === 'Showdown' || phase === 'Complete';
+  const cardsDealt = phase !== 'Waiting' && phase !== 'Starting' && phase !== 'AwaitingDeal';
+  const isShowdown = phase === 'Showdown' || phase === 'Complete' || phase === 'AwaitingShowdown';
 
   // Buffer community cards per-position to prevent flicker during phase transitions.
   // On-chain data briefly resets cards to 255 between phases (e.g. Flop→Turn).
@@ -622,7 +622,7 @@ export default function PokerTable({
   const lastValidCardsRef = useRef<number[]>([255, 255, 255, 255, 255]);
   const bufferedCommunityCards = useMemo(() => {
     // Reset on new hand
-    if (phase === 'Waiting' || phase === 'PreFlop') {
+    if (phase === 'Waiting' || phase === 'PreFlop' || phase === 'Starting' || phase === 'AwaitingDeal') {
       lastValidCardsRef.current = [255, 255, 255, 255, 255];
       return [255, 255, 255, 255, 255];
     }
@@ -749,7 +749,7 @@ export default function PokerTable({
   const revealedCount = useMemo(() => {
     if (phase === 'Flop' || phase === 'TurnRevealPending') return 3;
     if (phase === 'Turn' || phase === 'RiverRevealPending') return 4;
-    if (phase === 'River' || phase === 'Showdown' || phase === 'Complete') return 5;
+    if (phase === 'River' || phase === 'Showdown' || phase === 'AwaitingShowdown' || phase === 'Complete') return 5;
     if (phase === 'FlopRevealPending') return 0; // flop not yet dealt
     return 0;
   }, [phase]);
@@ -870,15 +870,22 @@ export default function PokerTable({
     return { results, winnerKey };
   }, [isShowdown, players, communityCards, myCards, publicKey]);
 
-  const phaseColor = {
+  const phaseColor: Record<string, string> = {
     Waiting: 'text-gray-400 bg-white/[0.04] border-white/[0.06]',
+    Starting: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20',
+    AwaitingDeal: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20',
     PreFlop: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20',
     Flop: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
+    FlopRevealPending: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
     Turn: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
+    TurnRevealPending: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
     River: 'text-orange-400 bg-orange-500/10 border-orange-500/20',
+    RiverRevealPending: 'text-orange-400 bg-orange-500/10 border-orange-500/20',
     Showdown: 'text-purple-400 bg-purple-500/10 border-purple-500/20',
+    AwaitingShowdown: 'text-purple-400 bg-purple-500/10 border-purple-500/20',
     Complete: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20',
-  }[phase] || 'text-gray-400 bg-white/[0.04] border-white/[0.06]';
+  };
+  const phaseColorClass = phaseColor[phase] || 'text-gray-400 bg-white/[0.04] border-white/[0.06]';
 
   return (
     <div className="relative w-full max-w-4xl mx-auto">
@@ -977,6 +984,24 @@ export default function PokerTable({
           );
           return null;
         })()}
+
+        {/* MPC processing overlay — shows during Arcium MPC computation */}
+        {(phase === 'AwaitingDeal' || phase === 'Starting' || phase === 'FlopRevealPending' || phase === 'TurnRevealPending' || phase === 'RiverRevealPending' || phase === 'AwaitingShowdown') && (
+          <div className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none">
+            <div className="px-6 py-3 rounded-2xl bg-black/50 backdrop-blur-sm border border-cyan-500/20">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+                <span className="text-cyan-300 text-sm font-bold">
+                  {phase === 'AwaitingDeal' || phase === 'Starting' ? 'Shuffling & Dealing...' :
+                   phase === 'FlopRevealPending' ? 'Revealing Flop...' :
+                   phase === 'TurnRevealPending' ? 'Revealing Turn...' :
+                   phase === 'RiverRevealPending' ? 'Revealing River...' :
+                   'Revealing Hands...'}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Pot */}
         {pot > 0 && (

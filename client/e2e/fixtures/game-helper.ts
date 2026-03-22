@@ -4,7 +4,7 @@
  */
 import { Page, expect } from '@playwright/test';
 
-const BASE_URL = 'http://localhost:3000';
+const BASE_URL = process.env.E2E_BASE_URL || 'http://localhost:3001';
 
 /** Register the wallet on-chain if needed, then ensure lobby is visible */
 export async function registerAndGoToLobby(page: Page): Promise<void> {

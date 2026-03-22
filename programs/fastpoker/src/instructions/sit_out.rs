@@ -44,6 +44,12 @@ pub fn sit_out_handler(ctx: Context<SitOut>) -> Result<()> {
     }
 
     seat.status = SeatStatus::SittingOut;
+    // A5 fix: set sit_out_timestamp so crank_kick_inactive uses correct 5-min timer
+    let clock = Clock::get()?;
+    seat.sit_out_timestamp = clock.unix_timestamp;
+    // A6 fix: mark missed blinds so sit_in_handler charges them on return
+    seat.missed_sb = true;
+    seat.missed_bb = true;
 
     emit!(PlayerSatOut {
         table: table.key(),

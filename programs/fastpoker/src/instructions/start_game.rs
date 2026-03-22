@@ -134,7 +134,7 @@ pub fn handler(ctx: Context<StartGame>) -> Result<()> {
                 if data.len() > seat_num_offset {
                     let seat_num = data[seat_num_offset];
                     let status = data[status_off];
-                    if status != 0 && status != 5 { // Not Empty, not already Busted
+                    if status != 0 && status != 5 && status != 6 { // Not Empty, not Busted, not Leaving (A7)
                         if chips_offset + 8 <= data.len() {
                             let chips = u64::from_le_bytes(
                                 data[chips_offset..chips_offset + 8].try_into().unwrap_or([0; 8])
@@ -285,6 +285,37 @@ pub fn handler(ctx: Context<StartGame>) -> Result<()> {
                         let new_val = current.saturating_add(TIME_BANK_REGEN_SECONDS).min(TIME_BANK_MAX_SECONDS);
                         data[time_bank_offset..time_bank_offset + 2].copy_from_slice(&new_val.to_le_bytes());
                         data[time_bank_active_offset] = 0; // Reset active flag
+                    }
+                }
+            }
+        }
+    }
+
+    // === A3 fix: Auto-sitout 0-chip Active players in cash games ===
+    // Without this, a busted player stays Active → gets dealt in → posts 0 blind → degenerate hand.
+    // SNG has its own bust reconciliation above; cash games need this separate check.
+    if is_cash && !ctx.remaining_accounts.is_empty() {
+        for seat_info in ctx.remaining_accounts.iter() {
+            if let Ok(mut data) = seat_info.try_borrow_mut_data() {
+                if data.len() > status_offset && chips_offset + 8 <= data.len() {
+                    let status = data[status_offset];
+                    // Active (1) with 0 chips → force SittingOut
+                    if status == 1 {
+                        let chips = u64::from_le_bytes(
+                            data[chips_offset..chips_offset + 8].try_into().unwrap_or([0; 8])
+                        );
+                        if chips == 0 {
+                            let sn = data[seat_num_offset];
+                            data[status_offset] = 4; // SittingOut
+                            // A6: mark missed blinds so sit_in charges them on return
+                            let missed_sb_off: usize = 236;
+                            let missed_bb_off: usize = 237;
+                            if data.len() > missed_bb_off {
+                                data[missed_sb_off] = 1;
+                                data[missed_bb_off] = 1;
+                            }
+                            msg!("A3: Seat {} auto-sat-out (0 chips, cash game)", sn);
+                        }
                     }
                 }
             }

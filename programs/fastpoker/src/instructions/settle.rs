@@ -739,24 +739,31 @@ pub fn handler(
                     );
                     let total_owed = chips.saturating_add(vault_reserve);
 
-                    // Write cashout_chips
-                    seat_data[CASHOUT_CHIPS_OFFSET..CASHOUT_CHIPS_OFFSET + 8]
-                        .copy_from_slice(&total_owed.to_le_bytes());
-                    // Increment cashout_nonce
-                    let nonce = u64::from_le_bytes(
-                        seat_data[CASHOUT_NONCE_OFFSET..CASHOUT_NONCE_OFFSET + 8].try_into().unwrap_or([0; 8])
-                    );
-                    seat_data[CASHOUT_NONCE_OFFSET..CASHOUT_NONCE_OFFSET + 8]
-                        .copy_from_slice(&nonce.wrapping_add(1).to_le_bytes());
-                    // Zero chips and vault_reserve
-                    seat_data[chips_offset..chips_offset + 8].copy_from_slice(&0u64.to_le_bytes());
-                    seat_data[VAULT_RESERVE_OFFSET..VAULT_RESERVE_OFFSET + 8].copy_from_slice(&0u64.to_le_bytes());
+                    // B6 fix: only snapshot if there's actually something to cash out.
+                    // leave_cash_game may have already snapshotted during Waiting phase
+                    // (zeroed chips + vault_reserve). Without this guard, settle would
+                    // overwrite cashout_chips=0 + increment nonce → player loses money.
+                    if total_owed > 0 {
+                        // Write cashout_chips
+                        seat_data[CASHOUT_CHIPS_OFFSET..CASHOUT_CHIPS_OFFSET + 8]
+                            .copy_from_slice(&total_owed.to_le_bytes());
+                        // Increment cashout_nonce
+                        let nonce = u64::from_le_bytes(
+                            seat_data[CASHOUT_NONCE_OFFSET..CASHOUT_NONCE_OFFSET + 8].try_into().unwrap_or([0; 8])
+                        );
+                        seat_data[CASHOUT_NONCE_OFFSET..CASHOUT_NONCE_OFFSET + 8]
+                            .copy_from_slice(&nonce.wrapping_add(1).to_le_bytes());
+                        // Zero chips and vault_reserve
+                        seat_data[chips_offset..chips_offset + 8].copy_from_slice(&0u64.to_le_bytes());
+                        seat_data[VAULT_RESERVE_OFFSET..VAULT_RESERVE_OFFSET + 8].copy_from_slice(&0u64.to_le_bytes());
+                        msg!("Leaving seat {} snapshot: cashout_chips={}, nonce={}", seat_num, total_owed, nonce.wrapping_add(1));
+                    } else {
+                        msg!("Leaving seat {} already snapshotted (chips=0, reserve=0) — skipping", seat_num);
+                    }
 
                     // Remove from table masks
                     table.seats_occupied &= !(1u16 << (seat_num as u16));
                     table.current_players = table.current_players.saturating_sub(1);
-
-                    msg!("Leaving seat {} snapshot: cashout_chips={}, nonce={}", seat_num, total_owed, nonce.wrapping_add(1));
                 } else if current_status != 0 && current_status != 4 && current_status != 5 && current_status != 6 {
                     // 0=Empty, 4=SittingOut, 5=Busted, 6=Leaving — keep as-is
                     seat_data[status_offset] = 1; // Active

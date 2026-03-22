@@ -225,6 +225,8 @@ fn process_raise(table: &mut Table, seat: &mut PlayerSeat, amount: u64) -> Resul
 }
 
 fn process_all_in(table: &mut Table, seat: &mut PlayerSeat) -> Result<()> {
+    // A1 fix: prevent 0-chip all-in exploit (free ride to showdown)
+    require!(seat.chips > 0, PokerError::InsufficientChips);
     let all_in_amount = seat.chips;
     
     seat.bet_this_round += all_in_amount;

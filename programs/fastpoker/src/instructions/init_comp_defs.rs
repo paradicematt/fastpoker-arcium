@@ -27,16 +27,19 @@ use crate::ID as PROGRAM_ID;
 pub const COMP_DEF_OFFSET_SHUFFLE:  u32 = arcium_anchor::comp_def_offset("shuffle_and_deal");
 pub const COMP_DEF_OFFSET_REVEAL:   u32 = arcium_anchor::comp_def_offset("reveal_community");
 pub const COMP_DEF_OFFSET_SHOWDOWN: u32 = arcium_anchor::comp_def_offset("reveal_all_showdown");
+pub const COMP_DEF_OFFSET_CLAIM:    u32 = arcium_anchor::comp_def_offset("claim_hole_cards");
 
 // ── Circuit compiled sizes (from `wc -c build/*.arcis`) ──
 pub const CIRCUIT_LEN_SHUFFLE:  u32 = 12_761_152;
 pub const CIRCUIT_LEN_REVEAL:   u32 = 160_320;
 pub const CIRCUIT_LEN_SHOWDOWN: u32 = 287_108;
+pub const CIRCUIT_LEN_CLAIM:    u32 = 952_204;
 
 // ── Circuit weights (from build/*.weight → "weight" field) ──
 pub const WEIGHT_SHUFFLE:  u64 = 3_376_009_244;
 pub const WEIGHT_REVEAL:   u64 = 161_904_336;
 pub const WEIGHT_SHOWDOWN: u64 = 177_694_504;
+pub const WEIGHT_CLAIM:    u64 = 492_372_680;
 
 // ─────────────────────────────────────────────────────────────
 // InitShuffleCompDef — registers shuffle_and_deal circuit
@@ -246,5 +249,73 @@ impl<'info> InitCompDefAccs<'info> for InitShowdownCompDef<'info> {
 pub fn init_showdown_handler(ctx: Context<InitShowdownCompDef>) -> Result<()> {
     init_comp_def(ctx.accounts, None, None)?;
     msg!("Initialized reveal_all_showdown comp def (offset={})", COMP_DEF_OFFSET_SHOWDOWN);
+    Ok(())
+}
+
+// ─────────────────────────────────────────────────────────────
+// InitClaimCompDef — registers claim_hole_cards circuit
+// ─────────────────────────────────────────────────────────────
+
+#[derive(Accounts)]
+pub struct InitClaimCompDef<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+
+    #[account(
+        mut,
+        address = arcium_client::pda::mxe_acc(&PROGRAM_ID),
+    )]
+    pub mxe_account: Box<Account<'info, MXEAccount>>,
+
+    /// CHECK: comp_def_account
+    #[account(mut)]
+    pub comp_def_account: UncheckedAccount<'info>,
+
+    /// CHECK: address_lookup_table
+    #[account(mut)]
+    pub address_lookup_table: UncheckedAccount<'info>,
+
+    /// CHECK: LUT program
+    #[account(address = LUT_PROGRAM_ID)]
+    pub lut_program: UncheckedAccount<'info>,
+
+    pub arcium_program: Program<'info, Arcium>,
+    pub system_program: Program<'info, System>,
+}
+
+impl<'info> InitCompDefAccs<'info> for InitClaimCompDef<'info> {
+    fn arcium_program(&self) -> AccountInfo<'info> { self.arcium_program.to_account_info() }
+    fn mxe_program(&self) -> Pubkey { PROGRAM_ID }
+    fn signer(&self) -> AccountInfo<'info> { self.payer.to_account_info() }
+    fn mxe_acc(&self) -> AccountInfo<'info> { self.mxe_account.to_account_info() }
+    fn comp_def_acc(&self) -> AccountInfo<'info> { self.comp_def_account.to_account_info() }
+    fn address_lookup_table(&self) -> AccountInfo<'info> { self.address_lookup_table.to_account_info() }
+    fn lut_program(&self) -> AccountInfo<'info> { self.lut_program.to_account_info() }
+    fn system_program(&self) -> AccountInfo<'info> { self.system_program.to_account_info() }
+    fn params(&self) -> Vec<Parameter> {
+        // claim_hole_cards(packed_all: Enc<Mxe, AllCards>, player: Shared, seat_index: u8)
+        // Enc<Mxe> = PlaintextU128 (nonce) + Ciphertext (ct)
+        // Shared = ArcisX25519Pubkey + PlaintextU128 (nonce)
+        vec![
+            Parameter::PlaintextU128,     // MXE nonce for Pack<[u8;23]>
+            Parameter::Ciphertext,        // Pack<[u8;23]> ciphertext
+            Parameter::ArcisX25519Pubkey, // player x25519 pubkey
+            Parameter::PlaintextU128,     // player input nonce
+            Parameter::PlaintextU8,       // seat_index
+        ]
+    }
+    fn outputs(&self) -> Vec<Output> {
+        // 1 encrypted value (Enc<Shared, u16>) → raw MPC output uses stride-3 layout:
+        // [nonce, ct1, ct2] = 3 × 32-byte slots. Declare 3 outputs to receive all slots.
+        vec![Output::Ciphertext; 3]
+    }
+    fn comp_def_offset(&self) -> u32 { COMP_DEF_OFFSET_CLAIM }
+    fn compiled_circuit_len(&self) -> u32 { CIRCUIT_LEN_CLAIM }
+    fn weight(&self) -> u64 { WEIGHT_CLAIM }
+}
+
+pub fn init_claim_handler(ctx: Context<InitClaimCompDef>) -> Result<()> {
+    init_comp_def(ctx.accounts, None, None)?;
+    msg!("Initialized claim_hole_cards comp def (offset={})", COMP_DEF_OFFSET_CLAIM);
     Ok(())
 }

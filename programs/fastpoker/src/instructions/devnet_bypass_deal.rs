@@ -186,8 +186,8 @@ pub fn handler(ctx: Context<DevnetBypassDeal>) -> Result<()> {
     // HU: SB (dealer) acts first. Multi-way: UTG (left of BB) acts first.
     let active_mask = table.seats_occupied & !table.seats_folded;
     if active_count == 2 {
-        // HU: dealer/SB acts first preflop
-        table.current_player = table.dealer_button;
+        // B2 fix: HU dealer/SB acts first preflop (use small_blind_seat, not dealer_button)
+        table.current_player = table.small_blind_seat;
     } else {
         // Multi-way: UTG = next active after BB
         if let Some(utg) = table.next_seat_in_mask(table.big_blind_seat, active_mask) {

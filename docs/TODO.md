@@ -18,6 +18,10 @@
 - [x] `reveal_community`: reads MXE `Pack<[u8;23]>` → 5 PlaintextU8 community cards
 - [x] `reveal_all_showdown`: reads MXE `Pack<[u8;23]>` → 9 PlaintextU16 packed hole cards
 - [x] P0+P1 get client-side card viewing via Shared outputs
+- [x] **P2+ client-side card viewing** via `claim_hole_cards` circuit (B1 fix)
+  - 4th Arcis circuit: re-encrypts from MXE Pack to player's Shared key
+  - Queue/callback instructions + crank auto-claim + frontend session-key fallback
+  - E2E verified: 3p, 6p, 9p — all cards decrypt correctly, all unique
 
 ### Security
 - [x] Remove `devnet_bypass_deal` / `devnet_bypass_reveal` (plaintext card security hole)
@@ -42,21 +46,25 @@
 ## TODO (Priority Order)
 
 ### HIGH
-- [ ] **Frontend integration** — Wire encrypted card display + crank service into React client
+- [x] **Frontend integration** — ✅ Encrypted card display (`useArciumCards`), MPC phase overlays, session key fallback, crank integration. E2E tested (2/2 passed).
 - [ ] **Devnet deployment** — Deploy with `SKIP_BLS=0` (BLS enabled), test real Arcium cluster
 
 ### MEDIUM
-- [ ] **Port security tests to Arcium mode** — `backend/legacy/e2e-security-tests.ts` has 10 good
-  security vectors but uses removed `devnet_bypass_deal`. Port to use `arcium_deal` + MPC polling.
-- [ ] **Port crank stress test** — `backend/legacy/stress-test-crank.ts` multi-table parallel test.
-- [ ] **Client-side card viewing for P2+** — Currently only P0+P1 get Shared outputs.
-  P2+ need a separate `reveal_my_cards` MPC call for client-side viewing (~2s per player).
+- [x] **Port security tests to Arcium mode** — ✅ `backend/e2e-security-tests.ts` ported from
+  legacy. 11 security vectors: card privacy, gap griefing, double action, unauthorized settle/start,
+  non-player action, A1/A3/B3/B4 guards. Uses `arcium_deal` + MPC polling.
+- [x] **Port crank stress test** — ✅ `backend/stress-test-crank.ts` ported from legacy.
+  5 scenarios: HU idle, HU fold, HU leave, 3× parallel, 6-max sitout. x25519 keys required.
+- [x] **Client-side card viewing for P2+** — ✅ Implemented via `claim_hole_cards`.
+  Crank auto-claims + frontend session-key fallback. E2E tested 3/6/9 players.
 
 ### LOW
-- [ ] **Performance monitoring** — HandCostLog tracking, ER integration if avg > $0.10/hand
+- [x] **Performance monitoring** — ✅ `PerformanceTracker` class in `backend/stress-test-crank.ts` (Scenario 6).
+  Tracks per-hand: TX fees, CU consumed, MPC latency, wall clock time.
+  Scans crank-initiated TXs (start_game, arcium_deal, callbacks, settle).
+  Generates JSON report (`perf-report.json`) + ER threshold check ($0.10/hand).
 - [ ] **Clean up Rust warnings** — ~13 unused variable/import warnings in the program
-- [ ] **9-player settle CU budget** — Currently hardcoded 800K CU in E2E test. Should be
-  set in crank-service.ts and frontend too.
+- [x] **9-player settle CU budget** — ✅ Verified sufficient: 800K in E2E test, 1.3M in crank-service.
 
 ---
 
@@ -112,10 +120,13 @@ Single MPC call for all 9 players:
 | Multi-max E2E | `e2e-arcium-multimax.ts` | 3p + 6p + 9p: deal→streets→showdown→settle |
 | 5-hand timing | `e2e-arcium-5hands.ts` | HU: 5 consecutive hands, MPC timing |
 | Card proof | `e2e-arcium-cards.ts` | Encryption/decryption/privacy proof |
+| Claim cards | `e2e-claim-cards.ts` | P2+ hole card claim + decrypt (3/6/9 player) |
 | All tables | `e2e-all-tables.ts` | Every table type (cash + SNG tiers) |
 | Arcium deal | `smoke-test-arcium-deal.ts` | Quick MPC queue + callback |
 | Dealer license | `smoke-test-dealer-license.ts` | Bonding curve pricing |
 | Privacy | `smoke-test-privacy.ts` | Opponent can't decrypt cards |
 | Kick | `test-kick.ts` | Crank kick inactive player |
 | Permissionless | `test-permissionless.ts` | 5-wallet permissionless flow |
+| Security (Arcium) | `e2e-security-tests.ts` | 11 vectors: privacy, griefing, guards (A1/A3/B3/B4) |
+| Stress (Arcium) | `stress-test-crank.ts` | 5 scenarios: idle, fold, leave, parallel, sitout |
 | *Legacy (broken)* | `backend/legacy/` | 5 files using removed devnet_bypass_deal |

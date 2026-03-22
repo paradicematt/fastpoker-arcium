@@ -263,6 +263,8 @@ pub enum PokerError {
     ArciumComputationTimeout,
     #[msg("Shuffle not complete — cards not yet dealt")]
     ShuffleNotComplete,
+    #[msg("Seat is not occupied")]
+    SeatNotOccupied,
 
     // General Errors (6980-6999)
     #[msg("Arithmetic overflow")]

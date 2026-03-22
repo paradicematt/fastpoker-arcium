@@ -90,6 +90,8 @@ pub mod instructions {
     pub mod arcium_reveal_queue;
     pub mod arcium_showdown;
     pub mod arcium_showdown_queue;
+    pub mod arcium_claim_cards_queue;
+    pub mod arcium_claim_cards_callback;
     pub mod init_comp_defs;
     
     pub use create_table::*;
@@ -116,6 +118,8 @@ pub mod instructions {
     pub use arcium_reveal_queue::*;
     pub use arcium_showdown::*;
     pub use arcium_showdown_queue::*;
+    pub use arcium_claim_cards_queue::*;
+    pub use arcium_claim_cards_callback::*;
     pub use init_comp_defs::*;
     pub mod place_bid;
     pub mod resolve_auction;
@@ -445,6 +449,33 @@ pub mod fastpoker {
         output: arcium_anchor::SignedComputationOutputs<instructions::arcium_showdown::RevealShowdownOutput>,
     ) -> Result<()> {
         instructions::arcium_showdown::reveal_showdown_callback_handler(ctx, output)
+    }
+
+    // === Arcium MPC Claim Cards (B1 fix: P2+ hole card decryption) ===
+
+    /// Initialize claim_hole_cards computation definition (one-time setup)
+    pub fn init_claim_comp_def(ctx: Context<InitClaimCompDef>) -> Result<()> {
+        instructions::init_comp_defs::init_claim_handler(ctx)
+    }
+
+    /// Queue MPC claim_hole_cards for a single player (P2+).
+    /// Re-encrypts hole cards from MXE Pack to the player's Shared key.
+    /// PERMISSIONLESS — crank or player calls after deal callback.
+    pub fn arcium_claim_cards_queue(
+        ctx: Context<ArciumClaimCardsQueue>,
+        computation_offset: u64,
+        seat_index: u8,
+    ) -> Result<()> {
+        instructions::arcium_claim_cards_queue::handler(ctx, computation_offset, seat_index)
+    }
+
+    /// Callback: MPC claim_hole_cards result — writes encrypted cards to SeatCards.
+    /// Called by Arcium MPC cluster after claim_hole_cards computation completes.
+    pub fn claim_hole_cards_callback(
+        ctx: Context<ClaimHoleCardsCallback>,
+        output: arcium_anchor::SignedComputationOutputs<instructions::arcium_claim_cards_callback::ClaimHoleCardsOutput>,
+    ) -> Result<()> {
+        instructions::arcium_claim_cards_callback::claim_hole_cards_callback_handler(ctx, output)
     }
 
     // === Crank Instructions ===

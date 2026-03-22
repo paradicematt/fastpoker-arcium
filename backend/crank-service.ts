@@ -354,6 +354,9 @@ const DISC = {
   arciumShowdownQueue: Buffer.from(
     crypto.createHash('sha256').update('global:arcium_showdown_queue').digest().slice(0, 8),
   ),
+  arciumClaimCardsQueue: Buffer.from(
+    crypto.createHash('sha256').update('global:arcium_claim_cards_queue').digest().slice(0, 8),
+  ),
 };
 
 // ─── Permission creation + delegation discriminators (for L1→TEE SNG promotion) ───
@@ -1814,10 +1817,10 @@ function buildRecordPokerRakeIx(
 
 const DEFAULT_TX_CU_LIMIT = 1_300_000;
 const DEFAULT_TX_CU_PRICE_MICROLAMPORTS = 1;
-const CRANK_METRICS_PATH = process.env.CRANK_METRICS_PATH || 'j:/Poker/backend/crank-metrics.json';
-const CRANK_HEARTBEAT_PATH = process.env.CRANK_HEARTBEAT_PATH || 'j:/Poker/backend/crank-heartbeat.json';
-const CRANK_CONTROL_PATH = process.env.CRANK_CONTROL_PATH || 'j:/Poker/backend/crank-control.json';
-const CRANK_CONFIG_PATH = process.env.CRANK_CONFIG_PATH || 'j:/Poker/backend/crank-config.json';
+const CRANK_METRICS_PATH = process.env.CRANK_METRICS_PATH || 'j:/Poker-Arc/backend/crank-metrics.json';
+const CRANK_HEARTBEAT_PATH = process.env.CRANK_HEARTBEAT_PATH || 'j:/Poker-Arc/backend/crank-heartbeat.json';
+const CRANK_CONTROL_PATH = process.env.CRANK_CONTROL_PATH || 'j:/Poker-Arc/backend/crank-control.json';
+const CRANK_CONFIG_PATH = process.env.CRANK_CONFIG_PATH || 'j:/Poker-Arc/backend/crank-config.json';
 
 // ─── Crank Config (hot-reloadable) ───
 interface CrankConfig {
@@ -1881,7 +1884,7 @@ const DEFAULT_CRANK_CONFIG: CrankConfig = {
   l1_payer_keypair_path: '',
   pool_authority_keypair_path: '',
   state_cache_enabled: true,
-  state_cache_path: 'j:/Poker/backend/table-state-cache.json',
+  state_cache_path: 'j:/Poker-Arc/backend/table-state-cache.json',
   state_cache_include_seats: true,
   laserstream_enabled: false,
   laserstream_api_key: '',
@@ -4251,6 +4254,17 @@ class CrankService {
       case Phase.AwaitingDeal: {
         console.log(`  ⏳ AwaitingDeal — MPC shuffle_and_deal callback pending`);
         return true; // No action needed — MPC callback will advance phase
+      }
+
+      // ─── PREFLOP → claim_hole_cards for P2+ (fire-and-forget) ───
+      case Phase.Preflop: {
+        // B1 fix: After deal callback, P0+P1 have encrypted cards.
+        // P2+ need a separate MPC call (claim_hole_cards) to re-encrypt from MXE Pack.
+        // Fire-and-forget — don't block gameplay. Claims run in parallel.
+        this.crankClaimHoleCards(tablePda, state).catch((e: any) =>
+          console.warn(`  ⚠️  claim_hole_cards background error: ${e.message?.slice(0, 80)}`)
+        );
+        return true; // Normal Preflop — timeout system handles the rest
       }
 
       // ─── AWAITING_SHOWDOWN → MPC callback pending, monitor for timeout ───
@@ -6910,6 +6924,125 @@ class CrankService {
     } catch (e: any) {
       console.error(`  ❌ [${tag}] arcium_showdown_queue failed: ${e.message?.slice(0, 120)}`);
       return false;
+    }
+  }
+
+  /**
+   * B1 fix: Queue claim_hole_cards MPC for P2+ seats that need encrypted cards.
+   *
+   * After shuffle_and_deal callback, only P0+P1 have encrypted cards in SeatCards
+   * (SIZE=320 truncates stride-3 output). P2+ get their cards via this separate
+   * small MPC call that re-encrypts from the MXE Pack<[u8;23]>.
+   *
+   * Fire-and-forget — called from Preflop case in doCrank. Runs in parallel
+   * for all P2+ seats. Idempotent (re-queuing produces same result).
+   */
+  private async crankClaimHoleCards(tablePda: PublicKey, fallbackState: TableState): Promise<void> {
+    const tag = tablePda.toBase58().slice(0, 8);
+    const conn = this.getConnForTable(tablePda.toBase58());
+
+    // Deduplicate: only run once per hand
+    const claimKey = `${tablePda.toBase58()}-h${fallbackState.handNumber}-claim`;
+    if (this.startGameCooldown.has(claimKey)) return;
+    this.startGameCooldown.set(claimKey, Date.now() + 60_000);
+
+    const seatsOccupied = fallbackState.seatsOccupied;
+    const maxPlayers = fallbackState.maxPlayers;
+
+    // Find P2+ seats that need encrypted cards
+    const seatsNeedingClaim: number[] = [];
+    for (let i = 2; i < maxPlayers; i++) {
+      if (!(seatsOccupied & (1 << i))) continue;
+      // Check if SeatCards already has encrypted data (non-zero enc_card1)
+      try {
+        const [scPda] = PublicKey.findProgramAddressSync(
+          [Buffer.from('seat_cards'), tablePda.toBuffer(), Buffer.from([i])],
+          PROGRAM_ID,
+        );
+        const scInfo = await conn.getAccountInfo(scPda);
+        if (scInfo && scInfo.data.length >= 108) {
+          // enc_card1 at offset 76 (32 bytes). If all zeros → needs claim.
+          const enc1 = scInfo.data.slice(76, 108);
+          if (!enc1.every((b: number) => b === 0)) continue; // Already has encrypted cards
+        }
+      } catch {}
+      seatsNeedingClaim.push(i);
+    }
+
+    if (seatsNeedingClaim.length === 0) {
+      // Either ≤2 players or all seats already claimed
+      return;
+    }
+
+    console.log(`  🔑 [${tag}] Claiming hole cards for P${seatsNeedingClaim.join(',P')} (${seatsNeedingClaim.length} seat(s))`);
+
+    try {
+      const arciumEnv = getArciumEnv();
+      const clusterOffset = arciumEnv.arciumClusterOffset;
+      const compDefOffset = computeCompDefOffset('claim_hole_cards');
+      const mxeAccount = getMXEAccAddress(PROGRAM_ID);
+      const mempoolAccount = getMempoolAccAddress(clusterOffset);
+      const executingPool = getExecutingPoolAccAddress(clusterOffset);
+      const clusterAccount = getClusterAccAddress(clusterOffset);
+      const signPda = getArciumSignPda();
+      const feePool = getArciumFeePoolPda();
+      const clockPda = getArciumClockPda();
+      const deckState = getDeckStatePda(tablePda);
+
+      // Queue each seat in parallel
+      const promises = seatsNeedingClaim.map(async (seatIdx) => {
+        try {
+          // Unique computation offset per seat
+          const computationOffset = BigInt(fallbackState.handNumber) * BigInt(1_000_000)
+            + BigInt(500 + seatIdx) * BigInt(1_000)
+            + BigInt(Date.now() % 1_000);
+          const compOffsetBuf = Buffer.alloc(8);
+          compOffsetBuf.writeBigUInt64LE(computationOffset);
+          const computationAccount = getComputationAccAddress(clusterOffset, {
+            toArrayLike: (B: any, _e: string, l: number) => { const b = Buffer.alloc(l); compOffsetBuf.copy(b); return b; }
+          } as any);
+          const compDefAccount = getCompDefAccAddress(PROGRAM_ID, compDefOffset);
+
+          // IX data: disc(8) + computation_offset(u64:8) + seat_index(u8:1) = 17 bytes
+          const data = Buffer.alloc(17);
+          let offset = 0;
+          DISC.arciumClaimCardsQueue.copy(data, offset); offset += 8;
+          data.writeBigUInt64LE(computationOffset, offset); offset += 8;
+          data.writeUInt8(seatIdx, offset);
+
+          // Account list matching ArciumClaimCardsQueue struct order
+          const keys = [
+            { pubkey: this.teePayer.publicKey, isSigner: true,  isWritable: true  }, // payer
+            { pubkey: signPda,                 isSigner: false, isWritable: true  }, // sign_pda_account
+            { pubkey: mxeAccount,              isSigner: false, isWritable: false }, // mxe_account
+            { pubkey: mempoolAccount,          isSigner: false, isWritable: true  }, // mempool_account
+            { pubkey: executingPool,           isSigner: false, isWritable: true  }, // executing_pool
+            { pubkey: computationAccount,      isSigner: false, isWritable: true  }, // computation_account
+            { pubkey: compDefAccount,          isSigner: false, isWritable: false }, // comp_def_account
+            { pubkey: clusterAccount,          isSigner: false, isWritable: true  }, // cluster_account
+            { pubkey: feePool,                 isSigner: false, isWritable: true  }, // pool_account
+            { pubkey: clockPda,                isSigner: false, isWritable: true  }, // clock_account
+            { pubkey: ARCIUM_PROGRAM_ID,       isSigner: false, isWritable: false }, // arcium_program
+            { pubkey: tablePda,                isSigner: false, isWritable: false }, // table (read-only)
+            { pubkey: deckState,               isSigner: false, isWritable: false }, // deck_state (read-only)
+            { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }, // system_program
+          ];
+
+          const ix = new TransactionInstruction({ programId: PROGRAM_ID, keys, data });
+          const ok = await sendWithRetry(conn, ix, this.teePayer, `[${tag}] claim_hole_cards(seat=${seatIdx})`, 2, false, []);
+          if (ok) {
+            console.log(`  ✅ [${tag}] claim_hole_cards queued for seat ${seatIdx} (offset=${computationOffset})`);
+          }
+          return ok;
+        } catch (e: any) {
+          console.warn(`  ⚠️  [${tag}] claim_hole_cards seat ${seatIdx} failed: ${e.message?.slice(0, 80)}`);
+          return false;
+        }
+      });
+
+      await Promise.allSettled(promises);
+    } catch (e: any) {
+      console.error(`  ❌ [${tag}] crankClaimHoleCards failed: ${e.message?.slice(0, 120)}`);
     }
   }
 

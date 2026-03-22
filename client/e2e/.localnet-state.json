@@ -1,0 +1,22 @@
+{
+  "pokerMint": "9ySSaownZCEhjU79863QAA6ffeMSorS8wk8p7xikxkLk",
+  "poolPda": "FSKrGq26FxhMUSK85ksv2AykL5Am2HS9iXJwuVoQQvLY",
+  "tables": [
+    {
+      "id": "64e18dfb499de440f70b375054caee4225429cf9e1d776a4f0247267776ab973",
+      "pda": "BJ7E3VoTy8H5HrMUPnL6jsTXzybr5Up9B7CD1fkWCG2h",
+      "type": "Cash HU Micro"
+    },
+    {
+      "id": "cc45e96edcc3ec5029d8a078dae809c1836e83a9a82535b3013f0916638fb6ed",
+      "pda": "4jtJQPMKSt4KaMS7ngTLJ65GoR7iA5B6ozsrFYs27B9b",
+      "type": "Cash 6-max Micro"
+    },
+    {
+      "id": "af63d97c6123a03cbf16f44e15d654cbce8c809dbff89c7aac2c2b66b02f5839",
+      "pda": "5R3cs2BJjgtHj96tF5ktmthWeB5LRr2gF8P4xYkmanyP",
+      "type": "Cash 9-max Low"
+    }
+  ],
+  "bootstrappedAt": "2026-03-21T23:09:20.253Z"
+}

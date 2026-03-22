@@ -165,6 +165,9 @@ export default function CashGamePage() {
     arciumSeatIndex !== null && arciumSeatIndex >= 0 ? arciumSeatIndex : null,
     x25519Kp,
     mxePubkey,
+    2000,
+    session.sessionKey ?? null,
+    gameState?.handNumber ?? 0,
   );
 
   // Track active table in localStorage for the ActiveTableBar component

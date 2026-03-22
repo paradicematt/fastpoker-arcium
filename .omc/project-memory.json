@@ -1,0 +1,267 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1774160873138,
+  "projectRoot": "J:\\Poker-Arc",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      },
+      {
+        "name": "Rust",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "Cargo.toml"
+        ]
+      }
+    ],
+    "frameworks": [],
+    "packageManager": "cargo",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": "cargo build",
+    "testCommand": "npm test",
+    "lintCommand": "cargo clippy",
+    "devCommand": "cargo run",
+    "scripts": {
+      "setup": "node setup-devnet-local.js",
+      "airdrop": "node airdrop-poker.js",
+      "build:anchor": "cd programs/fastpoker && cargo build-sbf",
+      "build:steel": "cd contracts && ./build.sh",
+      "build:client": "cd client && npm run build",
+      "dev:client": "cd client && npm run dev",
+      "test": "cd tests && npm test",
+      "test:poker": "cd tests && npm run test:poker",
+      "test:magicblock": "cd tests && npm run test:magicblock",
+      "install:all": "npm install && cd client && npm install && cd ../tests && npm install",
+      "clean": "rm -rf target/deploy programs/fastpoker/target"
+    }
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "docs",
+      "scripts",
+      "tests"
+    ],
+    "gitBranches": null
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "artifacts": {
+      "path": "artifacts",
+      "purpose": null,
+      "fileCount": 69,
+      "lastAccessed": 1774160873094,
+      "keyFiles": [
+        "arcium_clock.json",
+        "arcium_fee_pool.json",
+        "arcium_program_0.8.5.so",
+        "arx_ata_5qzx_YoZa.json",
+        "arx_ata_A1x5_oA1M.json"
+      ]
+    },
+    "backend": {
+      "path": "backend",
+      "purpose": null,
+      "fileCount": 45,
+      "lastAccessed": 1774160873094,
+      "keyFiles": [
+        "admin-close-table.js",
+        "arcium-init-circuits.ts",
+        "check-deck-state.ts",
+        "check-failed-tx.ts",
+        "check-seatcards-offsets.js"
+      ]
+    },
+    "build": {
+      "path": "build",
+      "purpose": "Build output",
+      "fileCount": 41,
+      "lastAccessed": 1774160873111,
+      "keyFiles": [
+        "circuits.client_types.json",
+        "circuits.pre_profile.js",
+        "circuits.ts",
+        "claim_hole_cards.arcis",
+        "claim_hole_cards.arcis.ir"
+      ]
+    },
+    "client": {
+      "path": "client",
+      "purpose": null,
+      "fileCount": 15,
+      "lastAccessed": 1774160873111,
+      "keyFiles": [
+        "ARCHITECTURE.md",
+        "next-env.d.ts",
+        "next.config.js",
+        "package-lock.json",
+        "package.json"
+      ]
+    },
+    "contracts": {
+      "path": "contracts",
+      "purpose": null,
+      "fileCount": 12,
+      "lastAccessed": 1774160873111,
+      "keyFiles": [
+        "build-quick.sh",
+        "build.sh",
+        "build_latest.log",
+        "Cargo.lock",
+        "Cargo.toml"
+      ]
+    },
+    "docs": {
+      "path": "docs",
+      "purpose": "Documentation",
+      "fileCount": 3,
+      "lastAccessed": 1774160873111,
+      "keyFiles": [
+        "STARTUP-GUIDE.md",
+        "test-results-2026-03-21.md",
+        "TODO.md"
+      ]
+    },
+    "encrypted-ixs": {
+      "path": "encrypted-ixs",
+      "purpose": null,
+      "fileCount": 2,
+      "lastAccessed": 1774160873112,
+      "keyFiles": [
+        "Cargo.toml",
+        "rust-toolchain.toml"
+      ]
+    },
+    "programs": {
+      "path": "programs",
+      "purpose": null,
+      "fileCount": 4,
+      "lastAccessed": 1774160873112,
+      "keyFiles": [
+        "build-quick.sh",
+        "build-wsl.sh",
+        "fix-deploy.sh",
+        "recover-and-deploy.sh"
+      ]
+    },
+    "scripts": {
+      "path": "scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 168,
+      "lastAccessed": 1774160873112,
+      "keyFiles": [
+        "add-rust-log.sh",
+        "airdrop-poker.ts",
+        "all-node-logs.sh",
+        "anchor-shim.sh",
+        "arcium-callback-ix.sh"
+      ]
+    },
+    "shared": {
+      "path": "shared",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1774160873113,
+      "keyFiles": []
+    },
+    "target": {
+      "path": "target",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1774160873113,
+      "keyFiles": []
+    },
+    "tests": {
+      "path": "tests",
+      "purpose": "Test files",
+      "fileCount": 38,
+      "lastAccessed": 1774160873113,
+      "keyFiles": [
+        "authority-keypair.json",
+        "check-balances.ts",
+        "check-chips.ts",
+        "check-pool.ts",
+        "config.ts"
+      ]
+    },
+    "client\\data": {
+      "path": "client\\data",
+      "purpose": "Data files",
+      "fileCount": 1,
+      "lastAccessed": 1774160873115,
+      "keyFiles": [
+        "broken-tables.json"
+      ]
+    },
+    "contracts\\api": {
+      "path": "contracts\\api",
+      "purpose": "API routes",
+      "fileCount": 1,
+      "lastAccessed": 1774160873115,
+      "keyFiles": [
+        "Cargo.toml"
+      ]
+    },
+    "encrypted-ixs\\src": {
+      "path": "encrypted-ixs\\src",
+      "purpose": "Source code",
+      "fileCount": 1,
+      "lastAccessed": 1774160873116,
+      "keyFiles": [
+        "lib.rs"
+      ]
+    },
+    "shared\\types": {
+      "path": "shared\\types",
+      "purpose": "Type definitions",
+      "fileCount": 1,
+      "lastAccessed": 1774160873116,
+      "keyFiles": [
+        "index.ts"
+      ]
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "C:\\Users\\Below0\\.claude\\projects\\J--Poker-Arc\\memory",
+      "accessCount": 1,
+      "lastAccessed": 1774160879622,
+      "type": "directory"
+    },
+    {
+      "path": "docs\\TODO.md",
+      "accessCount": 1,
+      "lastAccessed": 1774160884876,
+      "type": "file"
+    },
+    {
+      "path": "Anchor.toml",
+      "accessCount": 1,
+      "lastAccessed": 1774160886156,
+      "type": "file"
+    },
+    {
+      "path": "Arcium.toml",
+      "accessCount": 1,
+      "lastAccessed": 1774160886286,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

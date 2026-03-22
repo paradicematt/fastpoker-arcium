@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { PublicKey } from '@solana/web3.js';
+import { Keypair, PublicKey } from '@solana/web3.js';
 import { useConnection } from '@solana/wallet-adapter-react';
 import { getSeatCardsPda } from '@/lib/pda';
 import { parseCard, Card } from '@/lib/cards';
 import { SEAT_CARDS_OFFSETS, CARD_NOT_DEALT } from '@/lib/constants';
 import type { X25519Keypair } from '@/lib/arcium-keys';
+import { claimHoleCards } from '@/lib/arcium-claim';
 
 interface UseArciumCardsReturn {
   holeCards: [Card | null, Card | null];
@@ -37,6 +38,8 @@ export function useArciumCards(
   x25519Keypair: X25519Keypair | null,
   mxePublicKey: Uint8Array | null,
   pollIntervalMs: number = 2000,
+  sessionKey: Keypair | null = null,
+  handNumber: number = 0,
 ): UseArciumCardsReturn {
   const { connection } = useConnection();
   const [holeCards, setHoleCards] = useState<[Card | null, Card | null]>([null, null]);
@@ -45,6 +48,9 @@ export function useArciumCards(
   const [error, setError] = useState<string | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastEncHex = useRef<string>('');
+  const claimAttempted = useRef<boolean>(false);
+  const emptyPollStart = useRef<number>(0);
+  const CLAIM_TIMEOUT_MS = 10_000; // wait 10s before frontend claims
 
   const fetchAndDecrypt = useCallback(async () => {
     if (!tablePda || seatIndex === null) {
@@ -76,10 +82,23 @@ export function useArciumCards(
       const encCard1 = data.slice(SEAT_CARDS_OFFSETS.ENC_CARD1, SEAT_CARDS_OFFSETS.ENC_CARD1 + 32);
       const isAllZero = encCard1.every((b: number) => b === 0);
       if (isAllZero) {
+        // Track how long enc_card1 has been empty for auto-claim
+        if (seatIndex !== null && seatIndex >= 2 && sessionKey && !claimAttempted.current) {
+          if (emptyPollStart.current === 0) {
+            emptyPollStart.current = Date.now();
+          } else if (Date.now() - emptyPollStart.current > CLAIM_TIMEOUT_MS) {
+            // Crank hasn't claimed — fire session key claim (fire-and-forget)
+            claimAttempted.current = true;
+            console.log(`[useArciumCards] Auto-claiming hole cards for seat ${seatIndex} via session key`);
+            claimHoleCards(connection, sessionKey, tablePda!, seatIndex).catch(() => {});
+          }
+        }
         setHoleCards([null, null]);
         setIsEncrypted(false);
         return;
       }
+      // Cards arrived — reset claim tracking
+      emptyPollStart.current = 0;
 
       // Encrypted cards exist — try to decrypt
       const encHex = Buffer.from(encCard1).toString('hex');
@@ -135,7 +154,15 @@ export function useArciumCards(
     } finally {
       setIsLoading(false);
     }
-  }, [tablePda, seatIndex, x25519Keypair, mxePublicKey, connection]);
+  }, [tablePda, seatIndex, x25519Keypair, mxePublicKey, connection, sessionKey]);
+
+  // Reset claim state when seat/table/hand changes (new hand)
+  useEffect(() => {
+    claimAttempted.current = false;
+    emptyPollStart.current = 0;
+    lastEncHex.current = '';
+    setHoleCards([null, null]);
+  }, [tablePda, seatIndex, handNumber]);
 
   // Poll for card updates
   useEffect(() => {

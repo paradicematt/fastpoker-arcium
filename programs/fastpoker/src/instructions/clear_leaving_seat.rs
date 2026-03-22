@@ -3,14 +3,12 @@ use crate::state::*;
 use crate::errors::PokerError;
 use crate::constants::*;
 
-/// Clear a Leaving seat on ER after L1 cashout has been processed.
+/// Clear a Leaving seat after cashout has been processed.
 /// Zeros all seat fields and sets status to Empty, freeing the seat for reuse.
 ///
 /// PERMISSIONLESS — anyone can call this (crank, player, etc.).
-/// TEE-SAFE — only references delegated accounts (table + seat).
-/// Receipt nonce check and permission reset are handled off-chain by the crank
-/// (receipt lives on L1 and is unreachable from TEE; Permission Program CPI
-/// also crashes the TEE proxy). clear_leaving_seat transfers NO funds.
+/// B7 fix: Receipt nonce check ensures cashout was processed before clearing.
+/// On L1 (Arcium), the receipt IS accessible — no TEE proxy limitation.
 #[derive(Accounts)]
 pub struct ClearLeavingSeat<'info> {
     /// Crank or anyone — fully permissionless
@@ -30,6 +28,14 @@ pub struct ClearLeavingSeat<'info> {
         constraint = seat.table == table.key() @ PokerError::SeatNotAtTable,
     )]
     pub seat: Account<'info, PlayerSeat>,
+
+    /// B7: Receipt PDA — verifies cashout was processed before clearing seat
+    #[account(
+        seeds = [RECEIPT_SEED, table.key().as_ref(), &[seat.seat_number]],
+        bump = receipt.bump,
+        constraint = receipt.table == table.key() @ PokerError::SeatNotAtTable,
+    )]
+    pub receipt: Account<'info, CashoutReceipt>,
 }
 
 pub fn handler(ctx: Context<ClearLeavingSeat>) -> Result<()> {
@@ -47,9 +53,16 @@ pub fn handler(ctx: Context<ClearLeavingSeat>) -> Result<()> {
         PokerError::SeatNotLeaving
     );
 
-    // Receipt nonce check removed — receipt lives on L1 (never delegated) and is
-    // unreachable from TEE proxy (crashes with 500). Crank verifies cashout off-chain
-    // before calling this. This instruction transfers NO funds — safe to skip.
+    // B7 fix: verify cashout was processed before clearing the seat.
+    // If cashout_chips > 0, the crank hasn't transferred funds yet — don't clear.
+    // Receipt nonce must match or exceed seat nonce to prove processing happened.
+    let receipt = &ctx.accounts.receipt;
+    if seat.cashout_chips > 0 {
+        require!(
+            receipt.last_processed_nonce >= seat.cashout_nonce,
+            PokerError::CashoutNotProcessed
+        );
+    }
 
     let seat_num = seat.seat_number;
 

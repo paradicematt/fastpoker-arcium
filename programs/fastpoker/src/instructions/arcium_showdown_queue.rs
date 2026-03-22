@@ -141,6 +141,10 @@ pub fn handler(
     // Only allow from Showdown phase (single call, not per-player)
     require!(table.phase == GamePhase::Showdown, PokerError::InvalidActionForPhase);
 
+    // B4 fix: don't queue showdown MPC if fold-win (only 1 non-folded player)
+    let pre_active = (table.seats_occupied & !table.seats_folded).count_ones();
+    require!(pre_active > 1, PokerError::InvalidActionForPhase);
+
     // Build MPC args for reveal_all_showdown circuit:
     // reveal_all_showdown(packed_holes: Enc<Mxe, Pack<[u8;18]>>, active_mask: u16)
     //

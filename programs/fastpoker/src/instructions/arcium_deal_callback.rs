@@ -208,6 +208,12 @@ pub fn shuffle_and_deal_callback_handler(
     )?;
     msg!("MPC SUCCESS: {} bytes raw output (expected {})", raw_bytes.len(), TOTAL_OUTPUT_SIZE);
 
+    // B3 fix: reject stale callbacks from previous hands
+    require!(
+        ctx.accounts.deck_state.hand_number == ctx.accounts.table.hand_number,
+        PokerError::ArciumCallbackInvalid
+    );
+
     // DIAGNOSTIC: dump first 8 bytes of each 32-byte slot to identify layout
     for s in 0..std::cmp::min(12, raw_bytes.len() / 32) {
         let off = s * 32;

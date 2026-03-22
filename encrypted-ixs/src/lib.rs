@@ -188,4 +188,33 @@ mod circuits {
             s5.reveal(), s6.reveal(), s7.reveal(), s8.reveal(),
         )
     }
+
+    // ========================================================================
+    // Circuit 4: claim_hole_cards
+    //
+    // Re-encrypts a single player's hole cards from the MXE Pack to their
+    // Shared key. Used by P2+ who don't get cards in the deal callback
+    // (SIZE=320 only fits Mxe + P0 + P1 in stride-3 layout).
+    //
+    // Permissionless — crank or player calls arcium_claim_cards_queue,
+    // MPC re-encrypts from Pack<[u8;23]>, callback writes to SeatCards.
+    //
+    // Parameters: PlaintextU128 (mxe nonce) + Ciphertext (Pack ct)
+    //           + ArcisX25519Pubkey + PlaintextU128 (player nonce)
+    //           + PlaintextU8 (seat_index)
+    // Output: 1 × Ciphertext (Enc<Shared, u16>)
+    // SIZE = 1 × 32 = 32 (we only need ct1; nonce = input_nonce + 1)
+    // ========================================================================
+    #[instruction]
+    pub fn claim_hole_cards(
+        packed_all: Enc<Mxe, AllCards>,
+        player: Shared,
+        seat_index: u8,
+    ) -> Enc<Shared, u16> {
+        let all: [u8; 23] = packed_all.to_arcis().unpack();
+        // Hole cards start at index 5: [comm×5, p0c1, p0c2, p1c1, ..., p8c2]
+        let idx: usize = (seat_index as usize) * 2 + 5;
+        let packed: u16 = (all[idx] as u16) * 256 + (all[idx + 1] as u16);
+        player.from_arcis(packed)
+    }
 }

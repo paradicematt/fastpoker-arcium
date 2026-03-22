@@ -62,6 +62,7 @@ const DISCRIMINATORS = {
   useTimeBank: Buffer.from([220, 110, 49, 12, 59, 132, 222, 130]),
   adminListToken: Buffer.from([44, 3, 235, 140, 142, 71, 129, 85]),
   setX25519Key: Buffer.from([0x0e, 0x88, 0x15, 0x54, 0x7a, 0x60, 0x10, 0x8f]),
+  arciumClaimCardsQueue: Buffer.from([20, 225, 139, 123, 8, 246, 146, 76]),
 };
 
 // Game type values matching Anchor enum

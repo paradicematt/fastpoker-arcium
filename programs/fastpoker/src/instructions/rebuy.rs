@@ -63,7 +63,7 @@ pub struct Rebuy<'info> {
 }
 
 pub fn handler(ctx: Context<Rebuy>, amount: u64) -> Result<()> {
-    let table = &ctx.accounts.table;
+    let table = &mut ctx.accounts.table;
     let seat = &mut ctx.accounts.seat;
 
     require!(amount > 0, PokerError::InvalidBuyIn);
@@ -157,9 +157,16 @@ pub fn handler(ctx: Context<Rebuy>, amount: u64) -> Result<()> {
     // Update seat chips
     seat.chips = new_chips;
 
-    // If player was sitting out with 0 chips, clear bust counter
+    // B8 fix: auto-activate after rebuy if SittingOut (common after bust).
+    // Without this, player stays SittingOut and must manually ReturnToPlay.
     if seat.status == SeatStatus::SittingOut {
         seat.hands_since_bust = 0;
+        if new_chips > 0 {
+            seat.status = SeatStatus::Active;
+            seat.waiting_for_bb = true; // Must wait for BB position per standard rules
+            table.seats_occupied |= 1 << seat.seat_number;
+            msg!("Rebuy auto-activated seat {} (was SittingOut)", seat.seat_number);
+        }
     }
 
     msg!(
