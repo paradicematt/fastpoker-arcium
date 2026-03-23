@@ -33,6 +33,7 @@ const getReceipt = (t: PublicKey, i: number) => pda([Buffer.from('receipt'), t.t
 const getTallyEr = (t: PublicKey) => pda([Buffer.from('crank_tally_er'), t.toBuffer()], ANCHOR_PROGRAM_ID);
 const getTallyL1 = (t: PublicKey) => pda([Buffer.from('crank_tally_l1'), t.toBuffer()], ANCHOR_PROGRAM_ID);
 const getDealerReg = () => pda([Buffer.from('dealer_registry')], ANCHOR_PROGRAM_ID);
+const getTierConfig = (mint: PublicKey) => pda([Buffer.from('tier_config'), mint.toBuffer()], ANCHOR_PROGRAM_ID);
 const getPlayer = (w: PublicKey) => pda([Buffer.from('player'), w.toBuffer()], ANCHOR_PROGRAM_ID);
 const getUnrefined = (w: PublicKey) => pda([Buffer.from('unrefined'), w.toBuffer()], STEEL_PROGRAM_ID);
 
@@ -127,6 +128,30 @@ async function main() {
     data: disc('init_dealer_registry'),
   }), [admin], 'init_dealer_registry');
   console.log('  ✓ Dealer registry initialized');
+
+  // ── 3a. Init SOL TokenTierConfig (rake caps for SOL tables) ──
+  console.log('\n  === Initializing SOL Tier Config ===');
+  const solMint = PublicKey.default; // SOL = all zeros
+  const tierConfigPda = getTierConfig(solMint);
+  const tierInfo = await conn.getAccountInfo(tierConfigPda);
+  if (tierInfo) {
+    console.log('  ✓ SOL TierConfig already exists');
+  } else {
+    // init_token_tier_config takes token_mint as instruction data (32 bytes after 8-byte disc)
+    const tierData = Buffer.alloc(40);
+    disc('init_token_tier_config').copy(tierData, 0);
+    solMint.toBuffer().copy(tierData, 8);
+    await send(conn, new TransactionInstruction({
+      programId: ANCHOR_PROGRAM_ID,
+      keys: [
+        { pubkey: admin.publicKey, isSigner: true, isWritable: true },
+        { pubkey: tierConfigPda, isSigner: false, isWritable: true },
+        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      ],
+      data: tierData,
+    }), [admin], 'init_token_tier_config');
+    console.log(`  ✓ SOL TierConfig: ${tierConfigPda.toBase58().slice(0, 12)}..`);
+  }
 
   // ── 3b. Register CrankOperator + purchase Dealer License for localnet crank ──
   console.log('\n  === Registering Crank Operator + Dealer License ===');
@@ -238,6 +263,8 @@ async function main() {
         { pubkey: t, isSigner: false, isWritable: true },
         { pubkey: poolPda, isSigner: false, isWritable: false },
         { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+        // TokenTierConfig for SOL — enables rake cap computation
+        { pubkey: tierConfigPda, isSigner: false, isWritable: false },
       ],
       data: Buffer.concat([disc('create_table'), serializeCfg(tableId, gt, st, mp, tier)]),
     }), [admin], `create_table(${label})`);
