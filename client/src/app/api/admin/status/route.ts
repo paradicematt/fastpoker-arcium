@@ -228,10 +228,10 @@ export async function GET(req: NextRequest) {
       const poolBuf = Buffer.from(poolRes.result.value.data[0], 'base64');
       if (poolBuf.length >= 176) {
         const POKER_DECIMALS = 1e9; // 9 decimals (SPL token mint)
-        const UNREFINED_DECIMALS = 1e6; // 6 decimals (Steel unrefined uses 1e6 precision)
+        const UNREFINED_DECIMALS = 1e9; // 9 decimals (same as POKER SPL token)
         pool = {
           totalStaked: readU64(poolBuf, 72) / POKER_DECIMALS,          // total_burned (stake weight) — POKER tokens (9 dec)
-          totalUnrefined: readU64(poolBuf, 144) / UNREFINED_DECIMALS,  // total_unrefined — unrefined POKER (6 dec)
+          totalUnrefined: readU64(poolBuf, 144) / UNREFINED_DECIMALS,  // total_unrefined — unrefined POKER (9 dec)
           solDistributed: readU64(poolBuf, 88) / LAMPORTS_PER_SOL,     // sol_rewards_distributed — SOL
           solClaimed: 0,                                                // not stored separately in Steel
           solAvailable: readU64(poolBuf, 80) / LAMPORTS_PER_SOL,       // sol_rewards_available — SOL
