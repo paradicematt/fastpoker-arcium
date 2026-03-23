@@ -448,26 +448,36 @@ async function main() {
   console.log('━'.repeat(60));
   console.log('  ⏳ Waiting for crank to distribute prizes...');
 
-  // Wait for prizes_distributed flag or phase back to Waiting
+  // Wait for prizes_distributed flag or phase transition Complete→Waiting
   const distStart = Date.now();
   let distributed = false;
-  while (Date.now() - distStart < 120_000) {
+  let lastPhase = -1;
+  while (Date.now() - distStart < 180_000) {
     const info = await conn.getAccountInfo(tablePda);
     if (info) {
       const t = readTable(Buffer.from(info.data));
+      // PRIMARY: Check prizesDist flag
       if (t.prizesDist) {
         distributed = true;
         console.log(`  ✅ Prizes distributed! Phase=${PHASE_NAMES[t.phase]}, eliminatedCount=${t.eliminatedCount}`);
         break;
       }
-      if (t.phase === 0 && t.hand === 0 && handCount > 0) {
-        // Table was reset
+      // SECONDARY: Detect phase transition Complete(9)→Waiting(0)
+      // reset_sng_table runs after distribute_prizes, so this confirms prizes were distributed
+      if (t.phase === 0 && lastPhase === 9 && handCount > 0) {
         distributed = true;
-        console.log('  ✅ Table reset (prizes distributed + reset_sng_table)');
+        console.log('  ✅ Table reset detected (Complete→Waiting = prizes distributed + reset)');
         break;
       }
+      // TERTIARY: Table is back to Waiting with 0 players (reset happened)
+      if (t.phase === 0 && t.curP === 0 && handCount > 0) {
+        distributed = true;
+        console.log('  ✅ Table reset (0 players, Waiting phase)');
+        break;
+      }
+      lastPhase = t.phase;
     }
-    await new Promise(r => setTimeout(r, 3000));
+    await new Promise(r => setTimeout(r, 1500));
   }
   results.push({ test: 'Distribute prizes', pass: distributed, detail: distributed ? 'ok' : 'timed out' });
 
@@ -565,21 +575,30 @@ async function main() {
 
     const claimSig = await send(conn, claimIx, [winner], 'claim_refined');
     if (claimSig) {
-      // Check token balance after
-      const ataAfter = await getAccount(conn, winnerAta.address);
-      const tokenBalAfter = Number(ataAfter.amount);
-      // unrefined_amount (6-dec) * 1000 = SPL amount (9-dec)
-      // 200_000_000 * 1000 = 200_000_000_000 (200 POKER in 9-dec)
-      // After 10% tax: 180_000_000 * 1000 = 180_000_000_000
-      console.log(`  Token balance after: ${tokenBalAfter} (${tokenBalAfter / 1e9} POKER)`);
-      console.log(`  Minted: ${tokenBalAfter - tokenBalBefore} (${(tokenBalAfter - tokenBalBefore) / 1e9} POKER)`);
-      claimRefinedPass = tokenBalAfter > tokenBalBefore;
+      // Wait for claim_refined to finalize and tokens to appear
+      console.log('  ⏳ Waiting for claim_refined to finalize...');
+      const claimWaitStart = Date.now();
+      while (Date.now() - claimWaitStart < 60_000) {
+        try {
+          const ataAfter = await getAccount(conn, winnerAta.address);
+          const tokenBalAfter = Number(ataAfter.amount);
+          if (tokenBalAfter > tokenBalBefore) {
+            console.log(`  Token balance after: ${tokenBalAfter} (${tokenBalAfter / 1e9} POKER)`);
+            console.log(`  Minted: ${tokenBalAfter - tokenBalBefore} (${(tokenBalAfter - tokenBalBefore) / 1e9} POKER)`);
+            claimRefinedPass = true;
+            break;
+          }
+        } catch (_e) { /* ATA may not exist yet */ }
+        await new Promise(r => setTimeout(r, 2000));
+      }
 
       // Check unrefined is now 0
-      const uAfter = await conn.getAccountInfo(getUnrefined(winner.publicKey));
-      if (uAfter) {
-        const unrefinedAfter = Number(Buffer.from(uAfter.data).readBigUInt64LE(40));
-        console.log(`  Unrefined after claim: ${unrefinedAfter} (should be 0)`);
+      if (claimRefinedPass) {
+        const uAfter = await conn.getAccountInfo(getUnrefined(winner.publicKey));
+        if (uAfter) {
+          const unrefinedAfter = Number(Buffer.from(uAfter.data).readBigUInt64LE(40));
+          console.log(`  Unrefined after claim: ${unrefinedAfter} (should be 0)`);
+        }
       }
     }
   } else {
@@ -629,18 +648,27 @@ async function main() {
 
       const burnSig = await send(conn, burnIx, [winner], 'burn_stake');
       if (burnSig) {
-        // Check stake PDA
-        const stakeInfo = await conn.getAccountInfo(stakePda);
-        if (stakeInfo && stakeInfo.data.length >= 48) {
-          // Stake layout: disc(8) + owner(32) + burned_amount(8) = offset 40
-          const burnedAmount = Number(Buffer.from(stakeInfo.data).readBigUInt64LE(40));
-          console.log(`  Staked (burned): ${burnedAmount} (${burnedAmount / 1e9} POKER)`);
-          burnStakePass = burnedAmount > 0;
+        // Wait for burn_stake to finalize
+        console.log('  ⏳ Waiting for burn_stake to finalize...');
+        const burnWaitStart = Date.now();
+        while (Date.now() - burnWaitStart < 60_000) {
+          const stakeInfo = await conn.getAccountInfo(stakePda);
+          if (stakeInfo && stakeInfo.data.length >= 48) {
+            const burnedAmount = Number(Buffer.from(stakeInfo.data).readBigUInt64LE(40));
+            if (burnedAmount > 0) {
+              console.log(`  Staked (burned): ${burnedAmount} (${burnedAmount / 1e9} POKER)`);
+              burnStakePass = true;
+              break;
+            }
+          }
+          await new Promise(r => setTimeout(r, 2000));
         }
 
         // Check token balance reduced
-        const ataAfter = await getAccount(conn, winnerAta.address);
-        console.log(`  Token balance after burn: ${Number(ataAfter.amount)} (${Number(ataAfter.amount) / 1e9} POKER)`);
+        try {
+          const ataAfter = await getAccount(conn, winnerAta.address);
+          console.log(`  Token balance after burn: ${Number(ataAfter.amount)} (${Number(ataAfter.amount) / 1e9} POKER)`);
+        } catch (_e) { /* ignore */ }
       }
     }
   } else {

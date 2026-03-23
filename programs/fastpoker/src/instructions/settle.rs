@@ -33,28 +33,6 @@ pub struct SettleHand<'info> {
     // Second half = seat_cards PDAs (for hole cards - to compute hands ON-CHAIN)
 }
 
-#[allow(dead_code)]
-fn only_one_player_remaining(seats: &[AccountInfo]) -> bool {
-    // Check if only one player hasn't folded
-    let mut active_count = 0;
-    for seat_info in seats {
-        if let Ok(data) = seat_info.try_borrow_data() {
-            // Check status byte (simplified offset check)
-            if data.len() > 8 + 32 + 32 + 32 + 8 + 8 + 8 + 64 + 32 + 2 {
-                let status_offset = 8 + 32 + 32 + 32 + 8 + 8 + 8 + 64 + 32 + 2 + 1;
-                if status_offset < data.len() {
-                    let status = data[status_offset];
-                    // SeatStatus::Active = 1, SeatStatus::AllIn = 3
-                    if status == 1 || status == 3 {
-                        active_count += 1;
-                    }
-                }
-            }
-        }
-    }
-    active_count == 1
-}
-
 /// Settle hand - FULLY ON-CHAIN
 /// No external hand scores needed - reads seat_cards and computes winners on-chain
 pub fn handler(

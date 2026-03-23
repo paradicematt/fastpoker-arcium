@@ -117,14 +117,8 @@ pub enum PokerError {
     DeckExhausted,
 
     // Tokenomics Errors (6700-6799)
-    #[msg("Rake deposit failed")]
-    RakeDepositFailed,
-    #[msg("Reward minting failed")]
-    RewardMintFailed,
     #[msg("Invalid pool account")]
     InvalidPool,
-    #[msg("Invalid card reveal - commitment mismatch")]
-    InvalidCardReveal,
 
     // Crank/Removal Errors (6800-6849)
     #[msg("Player is not sitting out")]

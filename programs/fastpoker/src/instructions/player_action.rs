@@ -411,59 +411,6 @@ fn process_leave_cash_game(table: &mut Table, seat: &mut PlayerSeat, slot: u64, 
     Ok(())
 }
 
-fn process_rebuy_topup(table: &mut Table, seat: &mut PlayerSeat, amount: u64) -> Result<()> {
-    // Cash games only
-    require!(table.game_type == GameType::CashGame, PokerError::InvalidGameType);
-
-    // Can only rebuy/top-up between hands
-    require!(table.phase == GamePhase::Waiting, PokerError::NotWaitingPhase);
-
-    // Must be seated (SittingOut for rebuy, or Active/SittingOut for top-up)
-    require!(
-        seat.status == SeatStatus::SittingOut || seat.status == SeatStatus::Active,
-        PokerError::InvalidSeatState
-    );
-
-    // Calculate table max buy-in
-    let (_, max_bb): (u64, u64) = if table.buy_in_type == 1 { (50, 250) } else { (20, 100) };
-    let max_buy_in = table.big_blind.checked_mul(max_bb).unwrap_or(u64::MAX);
-    let min_buy_in = table.big_blind.checked_mul(if table.buy_in_type == 1 { 50 } else { 20 }).unwrap_or(0);
-
-    // Can't exceed max buy-in
-    require!(
-        seat.chips.checked_add(amount).unwrap_or(u64::MAX) <= max_buy_in,
-        PokerError::TopUpExceedsMax
-    );
-
-    // Must have enough reserve
-    require!(seat.vault_reserve >= amount, PokerError::InsufficientReserve);
-
-    // For rebuy (0 chips), enforce minimum buy-in
-    if seat.chips == 0 {
-        require!(amount >= min_buy_in, PokerError::RebuyBelowMin);
-    }
-
-    // Move from reserve to chips
-    seat.vault_reserve -= amount;
-    seat.chips += amount;
-
-    // If was sitting out with 0 chips (busted), auto-return to active
-    if seat.status == SeatStatus::SittingOut && seat.chips > 0 {
-        seat.status = SeatStatus::Active;
-        // Ensure in occupied mask
-        table.seats_occupied |= 1 << seat.seat_number;
-    }
-
-    msg!(
-        "RebuyTopUp: seat {} added {} chips (now {}), reserve remaining: {}",
-        seat.seat_number,
-        amount,
-        seat.chips,
-        seat.vault_reserve
-    );
-    Ok(())
-}
-
 pub(crate) fn advance_action(table: &mut Table) -> Result<()> {
     // Only count this action toward round completion if the player is still active
     // (not folded or all-in after their action). This prevents premature round closure

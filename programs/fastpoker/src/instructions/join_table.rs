@@ -100,18 +100,6 @@ pub struct JoinTable<'info> {
     pub system_program: Program<'info, System>,
 }
 
-// Seat number passed as remaining account or derived
-#[allow(dead_code)]
-fn find_empty_seat(table: &Table, max: u8) -> Option<u8> {
-    // In practice, we'd check each seat PDA exists
-    // For now, use current_players as next available
-    if table.current_players < max {
-        Some(table.current_players)
-    } else {
-        None
-    }
-}
-
 pub fn handler(ctx: Context<JoinTable>, buy_in: u64, seat_number: u8, reserve: u64) -> Result<()> {
     let table = &mut ctx.accounts.table;
     let seat = &mut ctx.accounts.seat;
