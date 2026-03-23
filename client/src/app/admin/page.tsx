@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { CrankDashboard } from '@/components/admin/CrankDashboard';
+import { POKER_MINT } from '@/lib/constants';
 
 // ─── Types ───
 interface ParsedSeat {
@@ -215,7 +216,7 @@ function short(key: string): string {
   return key.slice(0, 6) + '...' + key.slice(-4);
 }
 
-const POKER_MINT_STR = 'DiJC3FVReapYYDwRnPMrCRH7aYyeJ47Nu81MemTaHZWX';
+const POKER_MINT_STR = POKER_MINT.toBase58();
 const SOL_MINT_STR = '11111111111111111111111111111111';
 const CLOSING_STUCK_SECS = 120;
 
@@ -339,7 +340,7 @@ function TableCard({ table, expanded, onToggle, seats, loadingSeats, onMarkBroke
 
             <span className="text-xs text-gray-500">
               {table.gameType === 3
-                ? `Cash · $${table.tokenMint === '11111111111111111111111111111111' ? 'SOL' : table.tokenMint === 'DiJC3FVReapYYDwRnPMrCRH7aYyeJ47Nu81MemTaHZWX' ? 'POKER' : table.tokenMint?.slice(0,4)}`
+                ? `Cash · $${table.tokenMint === '11111111111111111111111111111111' ? 'SOL' : table.tokenMint === POKER_MINT_STR ? 'POKER' : table.tokenMint?.slice(0,4)}`
                 : table.gameTypeName}
             </span>
 
@@ -930,7 +931,7 @@ function AuctionsAdmin() {
                   type="text"
                   value={listMint}
                   onChange={e => setListMint(e.target.value)}
-                  placeholder="e.g. DiJC3FVReapYYDwRnPMrCRH7aYyeJ47Nu81MemTaHZWX"
+                  placeholder={`e.g. ${POKER_MINT_STR}`}
                   className="w-full bg-gray-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-gray-300 placeholder-gray-600 focus:border-purple-500/40 focus:outline-none font-mono"
                 />
               </div>
@@ -1537,24 +1538,24 @@ export default function AdminPage() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div className="rounded-xl border border-amber-500/20 bg-gradient-to-br from-amber-500/[0.04] to-transparent p-4">
                   <div className="text-[10px] text-amber-400/60 uppercase tracking-wider mb-1">SOL Staking Rewards</div>
-                  <div className="text-lg font-bold text-amber-400 tabular-nums">{data.pool.solAvailable.toFixed(4)} <span className="text-xs font-normal">available</span></div>
-                  <div className="text-xs text-gray-500 mt-1">Distributed: {data.pool.solDistributed.toFixed(4)} · Claimed: {(data.pool.solClaimed ?? 0).toFixed(4)}</div>
-                  <div className="text-[10px] text-gray-600 mt-0.5">Delta (unclaimed): {(data.pool.solAvailable).toFixed(4)} SOL</div>
+                  <div className="text-lg font-bold text-amber-400 tabular-nums">{fmtAmt(data.pool.solAvailable, 0)} <span className="text-xs font-normal">available</span></div>
+                  <div className="text-xs text-gray-500 mt-1">Distributed: {fmtAmt(data.pool.solDistributed, 0)} · Claimed: {fmtAmt(data.pool.solClaimed ?? 0, 0)}</div>
+                  <div className="text-[10px] text-gray-600 mt-0.5">Delta (unclaimed): {fmtAmt(data.pool.solAvailable, 0)} SOL</div>
                 </div>
                 <div className="rounded-xl border border-cyan-500/20 bg-gradient-to-br from-cyan-500/[0.04] to-transparent p-4">
                   <div className="text-[10px] text-cyan-400/60 uppercase tracking-wider mb-1">POKER Staking Rewards</div>
-                  <div className="text-lg font-bold text-cyan-400 tabular-nums">{data.pool.pokerAvailable.toFixed(2)} <span className="text-xs font-normal">available</span></div>
-                  <div className="text-xs text-gray-500 mt-1">Distributed: {data.pool.pokerDistributed.toFixed(2)}</div>
+                  <div className="text-lg font-bold text-cyan-400 tabular-nums">{fmtAmt(data.pool.pokerAvailable, 0)} <span className="text-xs font-normal">available</span></div>
+                  <div className="text-xs text-gray-500 mt-1">Distributed: {fmtAmt(data.pool.pokerDistributed, 0)}</div>
                   <div className="text-[10px] text-gray-600 mt-0.5">From cash game rake (50%)</div>
                 </div>
                 <div className="rounded-xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/[0.04] to-transparent p-4">
                   <div className="text-[10px] text-emerald-400/60 uppercase tracking-wider mb-1">Total Staked (Burned)</div>
-                  <div className="text-lg font-bold text-emerald-400 tabular-nums">{data.pool.totalStaked.toFixed(0)} <span className="text-xs font-normal">POKER</span></div>
+                  <div className="text-lg font-bold text-emerald-400 tabular-nums">{fmtAmt(data.pool.totalStaked, 0)} <span className="text-xs font-normal">POKER</span></div>
                   <div className="text-xs text-gray-500 mt-1">Burned into pool for rewards</div>
                 </div>
                 <div className="rounded-xl border border-purple-500/20 bg-gradient-to-br from-purple-500/[0.04] to-transparent p-4">
                   <div className="text-[10px] text-purple-400/60 uppercase tracking-wider mb-1">Unrefined Total</div>
-                  <div className="text-lg font-bold text-purple-400 tabular-nums">{data.pool.totalUnrefined.toFixed(0)} <span className="text-xs font-normal">POKER</span></div>
+                  <div className="text-lg font-bold text-purple-400 tabular-nums">{fmtAmt(data.pool.totalUnrefined, 0)} <span className="text-xs font-normal">POKER</span></div>
                   <div className="text-xs text-gray-500 mt-1">SNG prizes (pending refine)</div>
                 </div>
               </div>

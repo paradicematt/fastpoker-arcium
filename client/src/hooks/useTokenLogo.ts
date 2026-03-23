@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
+import { POKER_MINT } from '@/lib/constants';
 
 const SOL_DEFAULT_B58 = '11111111111111111111111111111111';
-const POKER_MINT_B58 = 'DiJC3FVReapYYDwRnPMrCRH7aYyeJ47Nu81MemTaHZWX';
+const POKER_MINT_B58 = POKER_MINT.toBase58();
 
 function getTokenImageFallback(mint?: string): string {
   if (!mint || mint === SOL_DEFAULT_B58) return '/tokens/sol.svg';

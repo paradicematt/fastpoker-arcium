@@ -7,6 +7,7 @@ import { evaluateHand, compareHands, HandResult } from '@/lib/hand-evaluator';
 import { useSoundEffects } from '@/hooks/useSoundEffects';
 import { getAvatarById } from '@/lib/avatars';
 import { useTokenLogo } from '@/hooks/useTokenLogo';
+import { POKER_MINT } from '@/lib/constants';
 
 // ─── Types ───
 
@@ -78,7 +79,7 @@ interface PokerTableProps {
 const SUITS = ['♠', '♥', '♦', '♣'];
 const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A'];
 
-const POKER_MINT_B58 = 'DiJC3FVReapYYDwRnPMrCRH7aYyeJ47Nu81MemTaHZWX';
+const POKER_MINT_B58 = POKER_MINT.toBase58();
 const SOL_DEFAULT_B58 = '11111111111111111111111111111111';
 
 // Cash game values are in lamports (1e9 = 1 SOL). SNG values are virtual chips (5/10).

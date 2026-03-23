@@ -93,7 +93,10 @@ pub mod instructions {
     pub mod arcium_claim_cards_queue;
     pub mod arcium_claim_cards_callback;
     pub mod init_comp_defs;
-    
+    pub mod post_blind;
+    pub mod handle_blind_timeout;
+    pub mod abort_starting;
+
     pub use create_table::*;
     pub use award_xp::*;
     pub use claim_unclaimed::*;
@@ -121,6 +124,9 @@ pub mod instructions {
     pub use arcium_claim_cards_queue::*;
     pub use arcium_claim_cards_callback::*;
     pub use init_comp_defs::*;
+    pub use post_blind::*;
+    pub use handle_blind_timeout::*;
+    pub use abort_starting::*;
     pub mod place_bid;
     pub mod resolve_auction;
     pub mod initialize_auction_config;
@@ -331,6 +337,21 @@ pub mod fastpoker {
     /// Retry the failing instruction first. Misdeal is last resort.
     pub fn misdeal(ctx: Context<Misdeal>) -> Result<()> {
         instructions::cancel_hand::misdeal_handler(ctx)
+    }
+
+    /// OPEN-4: Player posts their blind during Starting phase (cash games).
+    pub fn post_blind(ctx: Context<PostBlind>) -> Result<()> {
+        instructions::post_blind::post_blind_handler(ctx)
+    }
+
+    /// OPEN-4: Crank handles blind timeout — auto-deducts and sits out.
+    pub fn handle_blind_timeout(ctx: Context<HandleBlindTimeout>) -> Result<()> {
+        instructions::handle_blind_timeout::handle_blind_timeout_handler(ctx)
+    }
+
+    /// OPEN-4: Abort Starting phase when < 2 active after blind timeout.
+    pub fn abort_starting(ctx: Context<AbortStarting>) -> Result<()> {
+        instructions::abort_starting::abort_starting_handler(ctx)
     }
 
 

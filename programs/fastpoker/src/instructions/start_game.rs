@@ -384,6 +384,12 @@ pub fn handler(ctx: Context<StartGame>) -> Result<()> {
     };
     table.small_blind_seat = sb_seat;
     table.big_blind_seat = bb_seat;
+
+    // OPEN-4: Reset blind posting state for new hand
+    table.blinds_posted = 0;
+    table.blind_deadline = 0;
+    table.players_ready = 0;
+    table.ready_deadline = 0;
     
     msg!("Blind positions set (active_mask={:#06x}): SB={}, BB={}", active_mask, sb_seat, bb_seat);
 

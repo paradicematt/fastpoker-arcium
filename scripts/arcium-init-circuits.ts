@@ -30,7 +30,7 @@ import {
 const PROGRAM_ID = new PublicKey('BGyLYzzS5tPASGSj6BbzpLbHVwm4Csg9C1QfD8KGDe3N');
 const RPC_URL = process.env.SOLANA_RPC_URL || 'http://localhost:8899';
 const LUT_PROGRAM_ID = new PublicKey('AddressLookupTab1e1111111111111111111111111');
-const CIRCUITS = ['shuffle_and_deal', 'reveal_community', 'reveal_player_cards'] as const;
+const CIRCUITS = ['shuffle_and_deal', 'reveal_community', 'reveal_all_showdown', 'claim_hole_cards'] as const;
 const CIRCUIT_BUILD_DIR = process.env.CIRCUIT_BUILD_DIR || path.resolve(__dirname, '..', 'build');
 
 // Discriminators for our init instructions (SHA256("global:<name>")[0..8])
@@ -42,6 +42,7 @@ function disc(name: string): Buffer {
 const DISC_INIT_SHUFFLE = disc('init_shuffle_comp_def');
 const DISC_INIT_REVEAL = disc('init_reveal_comp_def');
 const DISC_INIT_SHOWDOWN = disc('init_showdown_comp_def');
+const DISC_INIT_CLAIM = disc('init_claim_comp_def');
 
 function readKpJson(path: string): Keypair {
   const file = fs.readFileSync(path);
@@ -79,7 +80,8 @@ async function main() {
   const circuits: { name: typeof CIRCUITS[number]; disc: Buffer }[] = [
     { name: 'shuffle_and_deal', disc: DISC_INIT_SHUFFLE },
     { name: 'reveal_community', disc: DISC_INIT_REVEAL },
-    { name: 'reveal_player_cards', disc: DISC_INIT_SHOWDOWN },
+    { name: 'reveal_all_showdown', disc: DISC_INIT_SHOWDOWN },
+    { name: 'claim_hole_cards', disc: DISC_INIT_CLAIM },
   ];
 
   for (const circuit of circuits) {

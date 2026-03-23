@@ -152,6 +152,19 @@ pub struct Table {
     /// handle_timeout must pass the expected nonce to prevent race conditions
     /// where a player's action and the crank's timeout both succeed on TEE.
     pub action_nonce: u16,
+
+    // === OPEN-4: Blind Posting Deadline (Cash Games) ===
+
+    /// Bitmask of seats that have posted their blinds (cash games only).
+    /// Set during Starting phase; cleared at hand start.
+    pub blinds_posted: u16,
+    /// Unix timestamp deadline for blind posting (0 = no deadline / SNG forced blinds).
+    /// Cash games set this to now + 15s in start_game.
+    pub blind_deadline: i64,
+    /// Bitmask of seats ready to play (SNG ready-up, future use).
+    pub players_ready: u16,
+    /// Unix timestamp deadline for SNG ready-up (0 = no deadline, future use).
+    pub ready_deadline: i64,
 }
 
 impl Table {
@@ -210,7 +223,11 @@ impl Table {
         8 + // rake_cap
         1 + // is_private
         8 + // crank_pool_accumulated
-        2; // action_nonce (u16) — replaces reserved padding, keeps SIZE=437
+        2 + // action_nonce
+        2 + // blinds_posted
+        8 + // blind_deadline
+        2 + // players_ready
+        8; // ready_deadline — SIZE=457 (OPEN-4)
 
     /// Check if a seat is occupied
     pub fn is_seat_occupied(&self, seat: u8) -> bool {
