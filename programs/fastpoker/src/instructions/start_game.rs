@@ -420,6 +420,56 @@ pub fn handler(ctx: Context<StartGame>) -> Result<()> {
         }
     }
 
+    // === Vault reserve → chips conversion (mid-hand top-up safety net) ===
+    // If a player deposited via rebuy during a hand, funds went to vault_reserve.
+    // Convert all pending reserves to chips now, respecting max buy-in.
+    if is_cash && !ctx.remaining_accounts.is_empty() {
+        let vault_reserve_offset: usize = 262;
+        let (_, max_bb): (u64, u64) = if table.buy_in_type == 1 { (50, 250) } else { (20, 100) };
+        let max_buy_in = table.big_blind.saturating_mul(max_bb);
+
+        for seat_info in ctx.remaining_accounts.iter() {
+            if let Ok(mut data) = seat_info.try_borrow_mut_data() {
+                if data.len() >= vault_reserve_offset + 8 && data.len() > status_offset {
+                    let status = data[status_offset];
+                    // Active(1), SittingOut(4) — convert reserve to chips
+                    if status == 1 || status == 4 {
+                        let reserve = u64::from_le_bytes(
+                            data[vault_reserve_offset..vault_reserve_offset + 8].try_into().unwrap_or([0; 8])
+                        );
+                        if reserve > 0 {
+                            let chips = u64::from_le_bytes(
+                                data[chips_offset..chips_offset + 8].try_into().unwrap_or([0; 8])
+                            );
+                            let room = max_buy_in.saturating_sub(chips);
+                            let to_chips = reserve.min(room);
+                            let remaining = reserve - to_chips;
+                            let new_chips = chips + to_chips;
+
+                            data[chips_offset..chips_offset + 8].copy_from_slice(&new_chips.to_le_bytes());
+                            data[vault_reserve_offset..vault_reserve_offset + 8].copy_from_slice(&remaining.to_le_bytes());
+
+                            let sn = data[seat_num_offset];
+                            msg!("Vault reserve convert: seat {} reserve={} -> chips +{} (now {}), leftover={}",
+                                sn, reserve, to_chips, new_chips, remaining);
+
+                            // Auto-activate SittingOut player who now has chips
+                            if status == 4 && new_chips > 0 && chips == 0 {
+                                data[status_offset] = 1; // Active
+                                // Set waiting_for_bb (offset 239)
+                                if data.len() > 239 {
+                                    data[239] = 1;
+                                }
+                                table.seats_occupied |= 1 << sn;
+                                msg!("Auto-activated seat {} after vault_reserve conversion", sn);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // === POST BLINDS from remaining_accounts ===
     // Find correct remaining_account by seat_number (not by index — seats may be sparse)
     if !ctx.remaining_accounts.is_empty() {

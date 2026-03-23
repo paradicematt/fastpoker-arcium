@@ -6,14 +6,17 @@ use crate::constants::*;
 
 /// L1 Rebuy / Top-Up — cash games only.
 ///
-/// Allows a seated player to add chips between hands (Waiting phase).
+/// Allows a seated player to add chips between or during hands.
+/// - During Waiting/Complete phase: funds go directly to chips (instant top-up).
+/// - During active hand (any other phase): funds go to vault_reserve,
+///   which is converted to chips at next start_game.
+///
 /// Supports both SOL tables (transfer to TableVault) and SPL token tables
 /// (transfer to table's token escrow account).
 ///
 /// Constraints:
 ///   - Cash games only (not SNG/tournament)
-///   - Table must be in Waiting phase (between hands)
-///   - Player must be seated (SittingOut or Active with 0 chips)
+///   - Player must be seated (Active, SittingOut, Folded, or AllIn)
 ///   - Final chip stack must respect buy-in limits (20-100 BB normal, 50-250 BB deep)
 ///   - Cannot exceed max buy-in (no over-topping)
 
@@ -28,7 +31,6 @@ pub struct Rebuy<'info> {
         seeds = [TABLE_SEED, table.table_id.as_ref()],
         bump = table.bump,
         constraint = table.game_type == GameType::CashGame @ PokerError::InvalidActionForPhase,
-        constraint = table.phase == GamePhase::Waiting @ PokerError::HandInProgress,
     )]
     pub table: Box<Account<'info, Table>>,
 
@@ -68,25 +70,37 @@ pub fn handler(ctx: Context<Rebuy>, amount: u64) -> Result<()> {
 
     require!(amount > 0, PokerError::InvalidBuyIn);
 
-    // Player must be seated — Active (waiting between hands) or SittingOut (rebuy to return)
+    // Player must be seated — Active, SittingOut, Folded, or AllIn
     require!(
         seat.status == SeatStatus::Active
-            || seat.status == SeatStatus::SittingOut,
+            || seat.status == SeatStatus::SittingOut
+            || seat.status == SeatStatus::Folded
+            || seat.status == SeatStatus::AllIn,
         PokerError::InvalidActionForPhase
     );
 
-    // Validate final chip stack against buy-in limits
-    let new_chips = seat.chips.checked_add(amount).ok_or(PokerError::Overflow)?;
+    // Calculate buy-in limits
     let (min_bb, max_bb): (u64, u64) = if table.buy_in_type == 1 { (50, 250) } else { (20, 100) };
     let max_buy_in = table.big_blind.checked_mul(max_bb).ok_or(PokerError::Overflow)?;
 
-    // Cannot exceed max buy-in
-    require!(new_chips <= max_buy_in, PokerError::InvalidBuyIn);
+    // Check total (chips + existing reserve + new amount) against max buy-in
+    let total_effective = seat.chips
+        .checked_add(seat.vault_reserve).ok_or(PokerError::Overflow)?
+        .checked_add(amount).ok_or(PokerError::Overflow)?;
+    require!(total_effective <= max_buy_in, PokerError::InvalidBuyIn);
 
-    // If player had 0 chips (busted/sitting out), enforce minimum buy-in
-    if seat.chips == 0 {
-        let min_buy_in = table.big_blind.checked_mul(min_bb).ok_or(PokerError::Overflow)?;
-        require!(new_chips >= min_buy_in, PokerError::InvalidBuyIn);
+    // Determine if we can apply directly or must stage in vault_reserve
+    let is_between_hands = table.phase == GamePhase::Waiting || table.phase == GamePhase::Complete;
+
+    if is_between_hands {
+        // Direct apply: validate final chip stack
+        let new_chips = seat.chips.checked_add(amount).ok_or(PokerError::Overflow)?
+            .checked_add(seat.vault_reserve).ok_or(PokerError::Overflow)?;
+        // If player had 0 chips, enforce minimum buy-in
+        if seat.chips == 0 && seat.vault_reserve == 0 {
+            let min_buy_in = table.big_blind.checked_mul(min_bb).ok_or(PokerError::Overflow)?;
+            require!(new_chips >= min_buy_in, PokerError::InvalidBuyIn);
+        }
     }
 
     // Transfer funds based on table denomination
@@ -154,25 +168,35 @@ pub fn handler(ctx: Context<Rebuy>, amount: u64) -> Result<()> {
         return Err(PokerError::InvalidAccountData.into());
     }
 
-    // Update seat chips
-    seat.chips = new_chips;
+    if is_between_hands {
+        // Direct apply: convert any existing reserve + new amount to chips
+        let to_add = amount.checked_add(seat.vault_reserve).ok_or(PokerError::Overflow)?;
+        seat.chips = seat.chips.checked_add(to_add).ok_or(PokerError::Overflow)?;
+        seat.vault_reserve = 0;
 
-    // B8 fix: auto-activate after rebuy if SittingOut (common after bust).
-    // Without this, player stays SittingOut and must manually ReturnToPlay.
-    if seat.status == SeatStatus::SittingOut {
-        seat.hands_since_bust = 0;
-        if new_chips > 0 {
-            seat.status = SeatStatus::Active;
-            seat.waiting_for_bb = true; // Must wait for BB position per standard rules
-            table.seats_occupied |= 1 << seat.seat_number;
-            msg!("Rebuy auto-activated seat {} (was SittingOut)", seat.seat_number);
+        // B8 fix: auto-activate after rebuy if SittingOut (common after bust).
+        if seat.status == SeatStatus::SittingOut {
+            seat.hands_since_bust = 0;
+            if seat.chips > 0 {
+                seat.status = SeatStatus::Active;
+                seat.waiting_for_bb = true;
+                table.seats_occupied |= 1 << seat.seat_number;
+                msg!("Rebuy auto-activated seat {} (was SittingOut)", seat.seat_number);
+            }
         }
+        msg!(
+            "Rebuy complete: seat {} now has {} chips (added {}), max={}",
+            seat.seat_number, seat.chips, to_add, max_buy_in
+        );
+    } else {
+        // Mid-hand: stage in vault_reserve, converted at next start_game
+        seat.vault_reserve = seat.vault_reserve
+            .checked_add(amount).ok_or(PokerError::Overflow)?;
+        msg!(
+            "Rebuy staged: seat {} vault_reserve={} (added {}), chips={}, max={}",
+            seat.seat_number, seat.vault_reserve, amount, seat.chips, max_buy_in
+        );
     }
-
-    msg!(
-        "Rebuy complete: seat {} now has {} chips (added {}), max={}",
-        seat.seat_number, new_chips, amount, max_buy_in
-    );
 
     Ok(())
 }

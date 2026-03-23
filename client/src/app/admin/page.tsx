@@ -180,7 +180,7 @@ function suitColor(c: number): string {
   if (c === 255 || c < 0 || c > 51) return 'text-gray-500';
   const suit = Math.floor(c / 13);
   // 0=♠ black, 1=♥ red, 2=♦ red, 3=♣ black
-  return suit === 1 || suit === 2 ? 'text-red-500' : 'text-white';
+  return suit === 1 || suit === 2 ? 'text-red-400' : 'text-gray-200';
 }
 
 // ─── Phase colors ───
@@ -354,7 +354,7 @@ function TableCard({ table, expanded, onToggle, seats, loadingSeats, onMarkBroke
                 'bg-rose-400/15 text-rose-400 border border-rose-400/20'
               }`}>
                 {table.tierName ?? 'Micro'}
-                {table.prizePool > 0 && ` · ${(table.prizePool / 1e9).toFixed(4)} SOL`}
+                {table.prizePool > 0 && ` · ${fmtAmt(table.prizePool)} SOL`}
               </span>
             )}
           </div>
@@ -477,11 +477,11 @@ function TableCard({ table, expanded, onToggle, seats, loadingSeats, onMarkBroke
                 </div>
                 <div>
                   <span className="text-gray-500">Entry / Fee</span>
-                  <div className="text-gray-300">{(table.entryAmount / 1e9).toFixed(4)} / {(table.feeAmount / 1e9).toFixed(4)} SOL</div>
+                  <div className="text-gray-300">{fmtAmt(table.entryAmount)} / {fmtAmt(table.feeAmount)} SOL</div>
                 </div>
                 <div>
                   <span className="text-gray-500">Prize Pool</span>
-                  <div className={table.prizePool > 0 ? 'text-amber-400 font-bold' : 'text-gray-500'}>{(table.prizePool / 1e9).toFixed(4)} SOL</div>
+                  <div className={table.prizePool > 0 ? 'text-amber-400 font-bold' : 'text-gray-500'}>{fmtAmt(table.prizePool)} SOL</div>
                 </div>
               </>
             )}
@@ -602,8 +602,8 @@ function TableCard({ table, expanded, onToggle, seats, loadingSeats, onMarkBroke
               <div className="text-xs text-gray-500 mb-2 uppercase tracking-wider">Prize Positions</div>
               <div className="space-y-1.5">
                 {payouts.map((p) => {
-                  const solVal = p.solLamports / 1e9;
-                  const pokerVal = p.pokerAmount / 1e6;
+                  const solVal = p.solLamports;
+                  const pokerVal = p.pokerAmount;
                   const placeLabel = p.place === 1 ? '1st' : p.place === 2 ? '2nd' : p.place === 3 ? '3rd' : `${p.place}th`;
                   return (
                     <div key={p.place} className="flex items-center justify-between rounded-lg bg-white/[0.02] border border-white/[0.05] px-3 py-1.5 text-xs">
@@ -620,8 +620,8 @@ function TableCard({ table, expanded, onToggle, seats, loadingSeats, onMarkBroke
                       </div>
                       <div className="flex items-center gap-3 font-mono">
                         <span className="text-cyan-300">{(p.payoutBps / 100).toFixed(1)}%</span>
-                        <span className="text-purple-300">{pokerVal.toFixed(0)} POKER</span>
-                        {solVal > 0 && <span className="text-emerald-300">{solVal.toFixed(4)} SOL</span>}
+                        <span className="text-purple-300">{fmtAmt(pokerVal, 6)} POKER</span>
+                        {solVal > 0 && <span className="text-emerald-300">{fmtAmt(solVal)} SOL</span>}
                       </div>
                     </div>
                   );
@@ -711,7 +711,7 @@ function TableCard({ table, expanded, onToggle, seats, loadingSeats, onMarkBroke
                       )}
                       {finish?.itm && (
                         <span className="text-emerald-400 text-[10px]">
-                          {(finish.itm.solLamports / 1e9).toFixed(4)} SOL · {(finish.itm.pokerAmount / 1e6).toFixed(0)} POKER
+                          {fmtAmt(finish.itm.solLamports)} SOL · {fmtAmt(finish.itm.pokerAmount, 6)} POKER
                         </span>
                       )}
                     </div>

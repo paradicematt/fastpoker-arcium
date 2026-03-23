@@ -50,8 +50,9 @@ pub struct PlayerSeat {
     pub cashout_chips: u64,
     /// Incremented each leave — for idempotent cashout processing
     pub cashout_nonce: u64,
-    /// DEPRECATED: Was for ER instant rebuys. Always 0 in Arcium architecture.
-    /// Cannot remove — changing layout would break all existing PlayerSeat PDAs.
+    /// Pending top-up funds staged during mid-hand rebuy.
+    /// Converted to chips at next start_game (respecting max buy-in).
+    /// Between hands (Waiting/Complete phase), rebuy goes directly to chips (reserve stays 0).
     pub vault_reserve: u64,
     /// Unix timestamp when player entered SittingOut status (0 = not sitting out).
     /// Crank checks this to auto-remove players sitting out > 5 minutes.
