@@ -284,10 +284,7 @@ async function sendTx(
   } catch (e: any) {
     metrics.failedTxs++;
     const msg = e.message?.slice(0, 150) || 'unknown';
-    // Only log non-routine failures
-    if (!msg.includes('already in use') && !msg.includes('custom program error')) {
-      console.log(`  [TX FAIL] ${label}: ${msg}`);
-    }
+    console.log(`  [TX FAIL] ${label}: ${msg}`);
     return null;
   }
 }
@@ -308,54 +305,59 @@ function shortKey(pk: PublicKey): string {
 // SETUP
 // ═══════════════════════════════════════════════════════════════
 
-async function setupPlayers(conn: Connection, count: number, metrics: Metrics): Promise<Keypair[]> {
+async function setupPlayers(conn: Connection, count: number, admin: Keypair, metrics: Metrics): Promise<Keypair[]> {
   console.log(`\n  Setting up ${count} players...`);
   const players: Keypair[] = [];
 
-  // Generate and airdrop in batches of 5
+  // Generate all keypairs first
+  for (let i = 0; i < count; i++) players.push(Keypair.generate());
+
+  // Fund players via SOL transfer from admin (much faster than individual airdrops)
   for (let batch = 0; batch < count; batch += 5) {
     const batchSize = Math.min(5, count - batch);
-    const batchPlayers: Keypair[] = [];
-
+    const tx = new Transaction();
     for (let i = 0; i < batchSize; i++) {
-      batchPlayers.push(Keypair.generate());
+      tx.add(SystemProgram.transfer({
+        fromPubkey: admin.publicKey,
+        toPubkey: players[batch + i].publicKey,
+        lamports: 50 * LAMPORTS_PER_SOL,
+      }));
     }
-
-    // Airdrop all in batch
-    const airdropPromises = batchPlayers.map(async (kp) => {
-      const sig = await conn.requestAirdrop(kp.publicKey, 50 * LAMPORTS_PER_SOL);
-      await conn.confirmTransaction(sig, 'confirmed');
-    });
-    await Promise.allSettled(airdropPromises);
-
-    // Register all in batch
-    for (const kp of batchPlayers) {
-      const playerPda = getPlayer(kp.publicKey);
-      const info = await conn.getAccountInfo(playerPda);
-      if (!info) {
-        await sendTx(conn, new TransactionInstruction({
-          programId: PROGRAM_ID,
-          keys: [
-            { pubkey: kp.publicKey, isSigner: true, isWritable: true },
-            { pubkey: playerPda, isSigner: false, isWritable: true },
-            { pubkey: TREASURY, isSigner: false, isWritable: true },
-            { pubkey: getPool(), isSigner: false, isWritable: true },
-            { pubkey: getUnrefined(kp.publicKey), isSigner: false, isWritable: true },
-            { pubkey: STEEL_PROGRAM_ID, isSigner: false, isWritable: false },
-            { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-          ],
-          data: IX.register_player,
-        }), [kp], `register_player ${shortKey(kp.publicKey)}`, metrics);
-      }
-      players.push(kp);
+    try {
+      await sendAndConfirmTransaction(conn, tx, [admin], { commitment: 'confirmed' });
+    } catch (e: any) {
+      console.log(`    Fund batch ${Math.floor(batch / 5) + 1} failed: ${e.message?.slice(0, 80)}`);
     }
-    console.log(`    Batch ${Math.floor(batch / 5) + 1}: ${batchSize} players funded + registered`);
+    console.log(`    Funded batch ${Math.floor(batch / 5) + 1}: ${batchSize} players (50 SOL each)`);
+  }
+
+  // Register all players sequentially
+  for (let i = 0; i < count; i++) {
+    const kp = players[i];
+    const playerPda = getPlayer(kp.publicKey);
+    const info = await conn.getAccountInfo(playerPda);
+    if (!info) {
+      await sendTx(conn, new TransactionInstruction({
+        programId: PROGRAM_ID,
+        keys: [
+          { pubkey: kp.publicKey, isSigner: true, isWritable: true },
+          { pubkey: playerPda, isSigner: false, isWritable: true },
+          { pubkey: TREASURY, isSigner: false, isWritable: true },
+          { pubkey: getPool(), isSigner: false, isWritable: true },
+          { pubkey: getUnrefined(kp.publicKey), isSigner: false, isWritable: true },
+          { pubkey: STEEL_PROGRAM_ID, isSigner: false, isWritable: false },
+          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+        ],
+        data: IX.register_player,
+      }), [kp], `register_player ${shortKey(kp.publicKey)}`, metrics);
+    }
+    if ((i + 1) % 10 === 0) console.log(`    Registered ${i + 1}/${count} players`);
   }
 
   return players;
 }
 
-async function setupCranks(conn: Connection, count: number, metrics: Metrics): Promise<Keypair[]> {
+async function setupCranks(conn: Connection, count: number, admin: Keypair, metrics: Metrics): Promise<Keypair[]> {
   console.log(`\n  Setting up ${count} crank keypairs (for tally verification)...`);
   const cranks: Keypair[] = [];
 
@@ -363,12 +365,14 @@ async function setupCranks(conn: Connection, count: number, metrics: Metrics): P
     const kp = Keypair.generate();
     cranks.push(kp);
 
-    // Airdrop
+    // Fund from admin via transfer
     try {
-      const sig = await conn.requestAirdrop(kp.publicKey, 50 * LAMPORTS_PER_SOL);
-      await conn.confirmTransaction(sig, 'confirmed');
+      const tx = new Transaction().add(SystemProgram.transfer({
+        fromPubkey: admin.publicKey, toPubkey: kp.publicKey, lamports: 5 * LAMPORTS_PER_SOL,
+      }));
+      await sendAndConfirmTransaction(conn, tx, [admin], { commitment: 'confirmed' });
     } catch (e: any) {
-      console.log(`    Crank ${i} airdrop failed: ${e.message?.slice(0, 80)}`);
+      console.log(`    Crank ${i} fund failed: ${e.message?.slice(0, 80)}`);
       continue;
     }
 
@@ -498,14 +502,11 @@ async function createTables(
 // PLAYER ACTIONS
 // ═══════════════════════════════════════════════════════════════
 
-function joinIx(player: PublicKey, tbl: PublicKey, seat: number, buyIn: bigint, isSng = false): TransactionInstruction {
+function joinIx(player: PublicKey, tbl: PublicKey, seat: number, buyIn: bigint): TransactionInstruction {
   const d = Buffer.alloc(25);
   IX.join_table.copy(d);
   d.writeBigUInt64LE(buyIn, 8);
   d[16] = seat;
-  // reserve = 0 (offset 17, 8 bytes) — already zero from alloc
-  const TREASURY = new PublicKey('4GaUxfVdaKz8wMryTtXGVdCnGeRMzEMW7aVw3epxwew3');
-  const POOL = pda([Buffer.from('pool')], new PublicKey('9qHC57uFi6wz8iit1HwVq3yms81Hn4rgwtE73rh3hZY6'));
   return new TransactionInstruction({
     programId: PROGRAM_ID,
     keys: [
@@ -516,18 +517,7 @@ function joinIx(player: PublicKey, tbl: PublicKey, seat: number, buyIn: bigint, 
       { pubkey: getMarker(player, tbl), isSigner: false, isWritable: true },
       { pubkey: getVault(tbl), isSigner: false, isWritable: true },
       { pubkey: getReceipt(tbl, seat), isSigner: false, isWritable: true },
-      // treasury (SNG entry fee destination — 50%)
-      { pubkey: isSng ? TREASURY : PROGRAM_ID, isSigner: false, isWritable: isSng },
-      // pool (SNG entry fee destination — 50%)
-      { pubkey: isSng ? POOL : PROGRAM_ID, isSigner: false, isWritable: isSng },
-      // player_token_account (not used for SOL tables)
-      { pubkey: PROGRAM_ID, isSigner: false, isWritable: false },
-      // table_token_account (not used for SOL tables)
-      { pubkey: PROGRAM_ID, isSigner: false, isWritable: false },
-      // unclaimed_balance (optional)
-      { pubkey: PROGRAM_ID, isSigner: false, isWritable: false },
-      // token_program (not used for SOL tables)
-      { pubkey: PROGRAM_ID, isSigner: false, isWritable: false },
+      ...Array(6).fill({ pubkey: PROGRAM_ID, isSigner: false, isWritable: false }),
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
     data: d,
@@ -583,8 +573,7 @@ async function joinPlayersToTable(
     // Cash = 200_000 lamports (100 BB at micro), SNG = buy-in fee (0.01 SOL for Micro tier)
     const buyIn = table.kind === 'cash' ? 200_000n : 10_000_000n;
 
-    const isSng = table.kind === 'sng';
-    const sig = await sendTx(conn, joinIx(kp.publicKey, table.tablePda, seatIndex, buyIn, isSng),
+    const sig = await sendTx(conn, joinIx(kp.publicKey, table.tablePda, seatIndex, buyIn),
       [kp], `join ${shortKey(kp.publicKey)} -> ${table.kind} table seat ${seatIndex}`, metrics);
 
     if (sig) {
@@ -1141,11 +1130,16 @@ async function main() {
   // ─── SETUP PHASE ───
   console.log('\n\n--- SETUP PHASE ---\n');
 
-  // Admin keypair for table creation
+  // Admin keypair for table creation — needs ~3000 SOL (40 players x 50 + 15 cranks x 50 + overhead)
   const admin = Keypair.generate();
-  const adminSig = await conn.requestAirdrop(admin.publicKey, 100 * LAMPORTS_PER_SOL);
-  await conn.confirmTransaction(adminSig, 'confirmed');
-  console.log(`  Admin: ${shortKey(admin.publicKey)} (100 SOL)`);
+  for (let i = 0; i < 7; i++) {
+    try {
+      const sig = await conn.requestAirdrop(admin.publicKey, 500 * LAMPORTS_PER_SOL);
+      await conn.confirmTransaction(sig, 'confirmed');
+    } catch { /* localnet may cap per-airdrop */ }
+  }
+  const adminBal = await conn.getBalance(admin.publicKey);
+  console.log(`  Admin: ${shortKey(admin.publicKey)} (${(adminBal / LAMPORTS_PER_SOL).toFixed(0)} SOL)`);
 
   // Fund treasury if needed
   try {
@@ -1190,11 +1184,11 @@ async function main() {
   }
 
   // Step 1-2: Generate and register crank keypairs
-  const cranks = await setupCranks(conn, 15, metrics);
+  const cranks = await setupCranks(conn, 15, admin, metrics);
   console.log(`  ${cranks.length} cranks ready\n`);
 
   // Step 3: Generate and register players
-  const players = await setupPlayers(conn, NUM_PLAYERS, metrics);
+  const players = await setupPlayers(conn, NUM_PLAYERS, admin, metrics);
   console.log(`  ${players.length} players ready\n`);
 
   // Step 4: Create tables
