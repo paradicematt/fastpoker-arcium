@@ -5,9 +5,12 @@
  * 40 players, and validates crank tally, rake, POKER tokenomics,
  * and overall system stability over a long period.
  *
- * The external crank-service handles all crank operations (start_game,
- * arcium_deal, settle, distribute_prizes, reset_sng_table). This test
- * focuses on:
+ * Self-cranking: the test directly calls start_game using its own 15
+ * rotating crank keypairs, avoiding the external crank-service subscription
+ * issue where start_game is not re-triggered after settle. The external
+ * crank-service still handles arcium_deal, settle, distribute_prizes,
+ * and reset_sng_table. This test handles:
+ *   - start_game (self-cranked with rotating crank keypairs)
  *   - Player actions (check/call/allin)
  *   - Claiming unrefined/refined POKER after SNG wins
  *   - Burn-staking POKER
@@ -553,6 +556,35 @@ function actionIx(player: PublicKey, tbl: PublicKey, seatNum: number, action: st
 }
 
 // ═══════════════════════════════════════════════════════════════
+// SELF-CRANKING: start_game
+// ═══════════════════════════════════════════════════════════════
+
+let crankIndex = 0;
+
+function startGameIx(
+  crankPubkey: PublicKey,
+  tablePda: PublicKey,
+  maxPlayers: number,
+  seatsOccupied: number,
+): TransactionInstruction {
+  const keys = [
+    { pubkey: crankPubkey, isSigner: true, isWritable: false },
+    { pubkey: tablePda, isSigner: false, isWritable: true },
+    { pubkey: getDeckState(tablePda), isSigner: false, isWritable: true },
+  ];
+  // remaining_accounts: occupied seats in ascending order
+  for (let i = 0; i < maxPlayers; i++) {
+    if (seatsOccupied & (1 << i)) {
+      keys.push({ pubkey: getSeat(tablePda, i), isSigner: false, isWritable: true });
+    }
+  }
+  // Append CrankTallyER so start_game records dealer actions
+  keys.push({ pubkey: getCrankEr(tablePda), isSigner: false, isWritable: true });
+
+  return new TransactionInstruction({ programId: PROGRAM_ID, keys, data: IX.start_game });
+}
+
+// ═══════════════════════════════════════════════════════════════
 // TABLE MANAGEMENT
 // ═══════════════════════════════════════════════════════════════
 
@@ -595,7 +627,7 @@ async function joinPlayersToTable(
 }
 
 async function processTableAction(
-  conn: Connection, table: TableInfo, metrics: Metrics,
+  conn: Connection, table: TableInfo, cranks: Keypair[], metrics: Metrics,
 ): Promise<void> {
   const info = await conn.getAccountInfo(table.tablePda);
   if (!info) return;
@@ -663,6 +695,68 @@ async function processTableAction(
     return;
   }
 
+  // ─── Waiting phase: self-crank start_game ───
+  if (t.phase === Phase.Waiting) {
+    // SNG Complete flow: table reset back to Waiting with 0 players
+    if (table.kind === 'sng' && t.prizesDist && t.curP === 0) {
+      table.sngCompleted++;
+      console.log(`  [SNG] Table ${shortKey(table.tablePda)} reset — round #${table.sngCompleted}`);
+
+      // Try to claim unrefined POKER for winners
+      for (const p of table.players) {
+        await tryClaimUnrefined(conn, p.kp, metrics);
+      }
+
+      // Clear player list and re-join
+      table.players = [];
+      table.actionsThisHand = 0;
+      return;
+    }
+
+    // Cash: re-join busted/left players before attempting start
+    if (table.kind === 'cash' && t.curP < table.maxPlayers) {
+      for (const p of table.players) {
+        const seatInfo = await conn.getAccountInfo(getSeat(table.tablePda, p.seatIndex));
+        if (seatInfo) {
+          const seat = readSeatData(Buffer.from(seatInfo.data));
+          if (seat.status === 0) { // Empty — player left or was removed
+            p.joined = false;
+            p.x25519Set = false;
+          }
+        }
+      }
+      table.players = table.players.filter(p => p.joined);
+    }
+
+    // Self-crank start_game when enough players are present
+    const canStartCash = table.kind === 'cash' && t.curP >= 2;
+    const canStartSng = table.kind === 'sng' && t.curP === t.maxP;
+
+    if ((canStartCash || canStartSng) && cranks.length > 0) {
+      const crank = cranks[crankIndex % cranks.length];
+      crankIndex++;
+
+      const ix = startGameIx(crank.publicKey, table.tablePda, t.maxP, t.occ);
+      const sig = await sendTx(conn, ix, [crank],
+        `${table.kind}[${shortKey(table.tablePda)}] start_game (crank ${shortKey(crank.publicKey)}, ${t.curP}p)`,
+        metrics);
+
+      if (sig) {
+        console.log(`  [CRANK] start_game ${table.kind}[${shortKey(table.tablePda)}] hand #${t.hand + 1} by ${shortKey(crank.publicKey)}`);
+      }
+    }
+    return;
+  }
+
+  // ─── SNG Complete: claim unrefined, claim refined, burn-stake ───
+  if (table.kind === 'sng' && t.phase === Phase.Complete) {
+    // Try claiming for all players (crank handles distribute_prizes + reset_sng_table)
+    for (const p of table.players) {
+      await tryClaimUnrefined(conn, p.kp, metrics);
+    }
+    return;
+  }
+
   // Playable phases: send player action
   if (t.phase >= Phase.Preflop && t.phase <= Phase.River) {
     const cp = t.curPlayer;
@@ -698,44 +792,6 @@ async function processTableAction(
     }
 
     table.actionsThisHand++;
-    return;
-  }
-
-  // ─── SNG Complete: handle post-game flow ───
-  if (table.kind === 'sng' && (t.phase === Phase.Complete || (t.phase === Phase.Waiting && t.prizesDist))) {
-    // Wait for crank to distribute_prizes and reset_sng_table
-    // Once table is back in Waiting with 0 players, we can re-join
-    if (t.phase === Phase.Waiting && t.curP === 0) {
-      table.sngCompleted++;
-      console.log(`  [SNG] Table ${shortKey(table.tablePda)} reset — round #${table.sngCompleted}`);
-
-      // Try to claim unrefined POKER for winners
-      for (const p of table.players) {
-        await tryClaimUnrefined(conn, p.kp, metrics);
-      }
-
-      // Clear player list and re-join
-      table.players = [];
-      table.actionsThisHand = 0;
-    }
-    return;
-  }
-
-  // ─── Cash game Waiting: re-join if needed ───
-  if (table.kind === 'cash' && t.phase === Phase.Waiting && t.curP < table.maxPlayers) {
-    // Check if players need to be re-added (after cashout or bust)
-    for (const p of table.players) {
-      const seatInfo = await conn.getAccountInfo(getSeat(table.tablePda, p.seatIndex));
-      if (seatInfo) {
-        const seat = readSeatData(Buffer.from(seatInfo.data));
-        if (seat.status === 0) { // Empty — player left or was removed
-          p.joined = false;
-          p.x25519Set = false;
-        }
-      }
-    }
-    // Remove disconnected players from tracking
-    table.players = table.players.filter(p => p.joined);
     return;
   }
 }
@@ -1103,7 +1159,8 @@ async function main() {
   console.log(`  Players:     ${NUM_PLAYERS}`);
   console.log(`  Poll interval: ${POLL_INTERVAL_MS}ms`);
   console.log('');
-  console.log('  Ensure crank-service is running!');
+  console.log('  Self-cranking start_game (15 rotating cranks)');
+  console.log('  Crank-service still needed for: arcium_deal, settle, distribute_prizes');
   console.log('='.repeat(60));
 
   const metrics: Metrics = {
@@ -1234,8 +1291,8 @@ async function main() {
           if (t.players.filter(p => p.joined).length < t.maxPlayers) {
             await joinPlayersToTable(conn, t, players, metrics);
           }
-          // Process table actions
-          await processTableAction(conn, t, metrics);
+          // Process table actions (self-cranking start_game with rotating cranks)
+          await processTableAction(conn, t, cranks, metrics);
         } catch (e: any) {
           t.errors++;
           // Don't crash on individual table errors
