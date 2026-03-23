@@ -498,11 +498,14 @@ async function createTables(
 // PLAYER ACTIONS
 // ═══════════════════════════════════════════════════════════════
 
-function joinIx(player: PublicKey, tbl: PublicKey, seat: number, buyIn: bigint): TransactionInstruction {
+function joinIx(player: PublicKey, tbl: PublicKey, seat: number, buyIn: bigint, isSng = false): TransactionInstruction {
   const d = Buffer.alloc(25);
   IX.join_table.copy(d);
   d.writeBigUInt64LE(buyIn, 8);
   d[16] = seat;
+  // reserve = 0 (offset 17, 8 bytes) — already zero from alloc
+  const TREASURY = new PublicKey('4GaUxfVdaKz8wMryTtXGVdCnGeRMzEMW7aVw3epxwew3');
+  const POOL = pda([Buffer.from('pool')], new PublicKey('9qHC57uFi6wz8iit1HwVq3yms81Hn4rgwtE73rh3hZY6'));
   return new TransactionInstruction({
     programId: PROGRAM_ID,
     keys: [
@@ -513,8 +516,18 @@ function joinIx(player: PublicKey, tbl: PublicKey, seat: number, buyIn: bigint):
       { pubkey: getMarker(player, tbl), isSigner: false, isWritable: true },
       { pubkey: getVault(tbl), isSigner: false, isWritable: true },
       { pubkey: getReceipt(tbl, seat), isSigner: false, isWritable: true },
-      // 6 padding accounts (remaining_accounts for optional token accounts)
-      ...Array(6).fill({ pubkey: PROGRAM_ID, isSigner: false, isWritable: false }),
+      // treasury (SNG entry fee destination — 50%)
+      { pubkey: isSng ? TREASURY : PROGRAM_ID, isSigner: false, isWritable: isSng },
+      // pool (SNG entry fee destination — 50%)
+      { pubkey: isSng ? POOL : PROGRAM_ID, isSigner: false, isWritable: isSng },
+      // player_token_account (not used for SOL tables)
+      { pubkey: PROGRAM_ID, isSigner: false, isWritable: false },
+      // table_token_account (not used for SOL tables)
+      { pubkey: PROGRAM_ID, isSigner: false, isWritable: false },
+      // unclaimed_balance (optional)
+      { pubkey: PROGRAM_ID, isSigner: false, isWritable: false },
+      // token_program (not used for SOL tables)
+      { pubkey: PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
     data: d,
@@ -570,7 +583,8 @@ async function joinPlayersToTable(
     // Cash = 200_000 lamports (100 BB at micro), SNG = buy-in fee (0.01 SOL for Micro tier)
     const buyIn = table.kind === 'cash' ? 200_000n : 10_000_000n;
 
-    const sig = await sendTx(conn, joinIx(kp.publicKey, table.tablePda, seatIndex, buyIn),
+    const isSng = table.kind === 'sng';
+    const sig = await sendTx(conn, joinIx(kp.publicKey, table.tablePda, seatIndex, buyIn, isSng),
       [kp], `join ${shortKey(kp.publicKey)} -> ${table.kind} table seat ${seatIndex}`, metrics);
 
     if (sig) {
