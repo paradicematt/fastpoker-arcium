@@ -47,9 +47,11 @@ pub fn sit_out_handler(ctx: Context<SitOut>) -> Result<()> {
     // A5 fix: set sit_out_timestamp so crank_kick_inactive uses correct 5-min timer
     let clock = Clock::get()?;
     seat.sit_out_timestamp = clock.unix_timestamp;
-    // A6 fix: mark missed blinds so sit_in_handler charges them on return
+    // A6 fix: mark missed SB so sit_in_handler charges dead SB on return.
+    // missed_bb is set later by OPEN-2 in start_game when the natural BB
+    // position actually rotates past this seat. Setting both here would
+    // overcharge a player who sits out and immediately sits back in.
     seat.missed_sb = true;
-    seat.missed_bb = true;
 
     emit!(PlayerSatOut {
         table: table.key(),

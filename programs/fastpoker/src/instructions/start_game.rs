@@ -277,12 +277,11 @@ pub fn handler(ctx: Context<StartGame>) -> Result<()> {
                                 let ts = clock.unix_timestamp.to_le_bytes();
                                 data[sit_out_ts_offset..sit_out_ts_offset + 8].copy_from_slice(&ts);
                             }
-                            // A6: mark missed blinds so sit_in charges them on return
+                            // A6: mark missed SB so sit_in charges dead SB on return.
+                            // missed_bb is set by OPEN-2 when natural BB passes this seat.
                             let missed_sb_off: usize = 236;
-                            let missed_bb_off: usize = 237;
-                            if data.len() > missed_bb_off {
+                            if data.len() > missed_sb_off {
                                 data[missed_sb_off] = 1;
-                                data[missed_bb_off] = 1;
                             }
                             msg!("A3: Seat {} auto-sat-out (0 chips, was status {}, cash game)", sn, status);
                         }
