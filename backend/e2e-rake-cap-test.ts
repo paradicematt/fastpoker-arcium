@@ -298,7 +298,7 @@ async function main() {
   console.log('  Ensure crank-service is running\n');
 
   // ─── Load admin keypair (SUPER_ADMIN) ───
-  const adminSecret = JSON.parse(fs.readFileSync('backend/.localnet-keypair.json', 'utf-8'));
+  const adminSecret = JSON.parse(fs.readFileSync(require('path').join(__dirname, '.localnet-keypair.json'), 'utf-8'));
   const admin = Keypair.fromSecretKey(Uint8Array.from(adminSecret));
   console.log(`  Admin: ${admin.publicKey.toBase58()}`);
 
