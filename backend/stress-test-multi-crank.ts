@@ -134,17 +134,27 @@ const metrics: StressMetrics = {
 
 // ─── Helpers ───
 async function send(conn: Connection, ix: TransactionInstruction, signers: Keypair[], label: string, quiet = false): Promise<string | null> {
-  try {
-    const sig = await sendAndConfirmTransaction(conn, new Transaction().add(ix), signers, { commitment: 'confirmed', skipPreflight: true });
-    if (!quiet) console.log(`  ✅ ${label}: ${sig.slice(0, 20)}...`);
-    return sig;
-  } catch (e: any) {
-    const msg = e.message?.slice(0, 150) || String(e);
-    if (!quiet) console.log(`  ❌ ${label}: ${msg}`);
-    // Also log program logs if available
-    if (e.logs) console.log(`    Logs: ${e.logs.filter((l: string) => l.includes('Error') || l.includes('failed')).join(' | ')}`);
-    return null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const tx = new Transaction().add(ix);
+      const { blockhash, lastValidBlockHeight } = await conn.getLatestBlockhash('confirmed');
+      tx.recentBlockhash = blockhash;
+      tx.lastValidBlockHeight = lastValidBlockHeight;
+      tx.feePayer = signers[0].publicKey;
+      const sig = await sendAndConfirmTransaction(conn, tx, signers, { commitment: 'confirmed', skipPreflight: true, maxRetries: 5 });
+      if (!quiet) console.log(`  ✅ ${label}: ${sig.slice(0, 20)}...`);
+      return sig;
+    } catch (e: any) {
+      const msg = e.message?.slice(0, 150) || String(e);
+      if (msg.includes('block height exceeded') && attempt < 2) {
+        continue; // retry with fresh blockhash
+      }
+      if (!quiet) console.log(`  ❌ ${label}: ${msg}`);
+      if (e.logs) console.log(`    Logs: ${e.logs.filter((l: string) => l.includes('Error') || l.includes('failed')).join(' | ')}`);
+      return null;
+    }
   }
+  return null;
 }
 
 function readTable(data: Buffer) {
