@@ -185,8 +185,8 @@ pub(crate) fn extract_mpc_output<O: HasSize + AnchorSerialize + AnchorDeserializ
         let _ = (cluster_account, computation_account); // suppress unused warnings
         match output {
             SignedComputationOutputs::Success(bytes, _sig) => Ok(bytes),
-            SignedComputationOutputs::Failure => {
-                msg!("MPC computation failed (Failure variant)");
+            SignedComputationOutputs::Failure(err, _sig) => {
+                msg!("MPC computation failed: {:?}", err);
                 Err(PokerError::ArciumComputationTimeout.into())
             }
             _ => Err(PokerError::ArciumCallbackInvalid.into()),
