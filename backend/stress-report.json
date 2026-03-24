@@ -1,0 +1,299 @@
+{
+  "startTime": 1774310947385,
+  "endTime": 1774313452514,
+  "cranks": [
+    {
+      "pubkey": "CDq5ANhv",
+      "tablesProcessed": 0,
+      "handsStarted": 0,
+      "errors": 0,
+      "earnings": 0
+    },
+    {
+      "pubkey": "Gz9uzjTB",
+      "tablesProcessed": 0,
+      "handsStarted": 0,
+      "errors": 0,
+      "earnings": 0
+    },
+    {
+      "pubkey": "A7tp2yuV",
+      "tablesProcessed": 0,
+      "handsStarted": 0,
+      "errors": 0,
+      "earnings": 0
+    },
+    {
+      "pubkey": "EiYwaCXN",
+      "tablesProcessed": 0,
+      "handsStarted": 0,
+      "errors": 0,
+      "earnings": 0
+    },
+    {
+      "pubkey": "3QfaKyRU",
+      "tablesProcessed": 0,
+      "handsStarted": 0,
+      "errors": 0,
+      "earnings": 0
+    },
+    {
+      "pubkey": "7wkaoJGS",
+      "tablesProcessed": 0,
+      "handsStarted": 0,
+      "errors": 0,
+      "earnings": 0
+    },
+    {
+      "pubkey": "5hf49iiP",
+      "tablesProcessed": 0,
+      "handsStarted": 0,
+      "errors": 0,
+      "earnings": 0
+    },
+    {
+      "pubkey": "4zVXNiX7",
+      "tablesProcessed": 0,
+      "handsStarted": 0,
+      "errors": 0,
+      "earnings": 0
+    },
+    {
+      "pubkey": "4sVRsFAc",
+      "tablesProcessed": 0,
+      "handsStarted": 0,
+      "errors": 0,
+      "earnings": 0
+    },
+    {
+      "pubkey": "EUY7o4h8",
+      "tablesProcessed": 0,
+      "handsStarted": 0,
+      "errors": 0,
+      "earnings": 0
+    },
+    {
+      "pubkey": "EZotrFFe",
+      "tablesProcessed": 0,
+      "handsStarted": 0,
+      "errors": 0,
+      "earnings": 0
+    },
+    {
+      "pubkey": "2oL9qYxu",
+      "tablesProcessed": 0,
+      "handsStarted": 0,
+      "errors": 0,
+      "earnings": 0
+    },
+    {
+      "pubkey": "6zd92UDd",
+      "tablesProcessed": 0,
+      "handsStarted": 0,
+      "errors": 0,
+      "earnings": 0
+    },
+    {
+      "pubkey": "A7zT8qwH",
+      "tablesProcessed": 0,
+      "handsStarted": 0,
+      "errors": 0,
+      "earnings": 0
+    },
+    {
+      "pubkey": "8h39nD5C",
+      "tablesProcessed": 0,
+      "handsStarted": 0,
+      "errors": 0,
+      "earnings": 0
+    }
+  ],
+  "tables": [
+    {
+      "pubkey": "JAAy5Yp5",
+      "type": "cash",
+      "handsCompleted": 18,
+      "totalPot": 0,
+      "totalRake": 0,
+      "stuck": false,
+      "lastActivityMs": 1774313441147
+    },
+    {
+      "pubkey": "2SUvy6Kh",
+      "type": "cash",
+      "handsCompleted": 18,
+      "totalPot": 0,
+      "totalRake": 0,
+      "stuck": false,
+      "lastActivityMs": 1774313446596
+    },
+    {
+      "pubkey": "HoxkUQw4",
+      "type": "cash",
+      "handsCompleted": 18,
+      "totalPot": 0,
+      "totalRake": 0,
+      "stuck": false,
+      "lastActivityMs": 1774313446941
+    },
+    {
+      "pubkey": "9ifcesMK",
+      "type": "cash",
+      "handsCompleted": 17,
+      "totalPot": 0,
+      "totalRake": 0,
+      "stuck": false,
+      "lastActivityMs": 1774313441094
+    },
+    {
+      "pubkey": "Awfxy9NM",
+      "type": "cash",
+      "handsCompleted": 17,
+      "totalPot": 0,
+      "totalRake": 0,
+      "stuck": false,
+      "lastActivityMs": 1774313446577
+    },
+    {
+      "pubkey": "78X5DpgX",
+      "type": "cash",
+      "handsCompleted": 16,
+      "totalPot": 0,
+      "totalRake": 0,
+      "stuck": false,
+      "lastActivityMs": 1774313441087
+    },
+    {
+      "pubkey": "6nL8BXZe",
+      "type": "cash",
+      "handsCompleted": 16,
+      "totalPot": 0,
+      "totalRake": 0,
+      "stuck": false,
+      "lastActivityMs": 1774313447212
+    },
+    {
+      "pubkey": "Gd1x5nea",
+      "type": "cash",
+      "handsCompleted": 0,
+      "totalPot": 0,
+      "totalRake": 0,
+      "stuck": false,
+      "lastActivityMs": 1774313447078
+    },
+    {
+      "pubkey": "2iKa9CG2",
+      "type": "cash",
+      "handsCompleted": 0,
+      "totalPot": 0,
+      "totalRake": 0,
+      "stuck": false,
+      "lastActivityMs": 1774313447410
+    },
+    {
+      "pubkey": "HZPXwXRa",
+      "type": "cash",
+      "handsCompleted": 0,
+      "totalPot": 0,
+      "totalRake": 0,
+      "stuck": false,
+      "lastActivityMs": 1774313447093
+    },
+    {
+      "pubkey": "HnD3pBCC",
+      "type": "sng",
+      "handsCompleted": 0,
+      "totalPot": 0,
+      "totalRake": 0,
+      "stuck": false,
+      "lastActivityMs": 1774313447212
+    },
+    {
+      "pubkey": "Fecfx2ve",
+      "type": "sng",
+      "handsCompleted": 0,
+      "totalPot": 0,
+      "totalRake": 0,
+      "stuck": false,
+      "lastActivityMs": 1774313447078
+    },
+    {
+      "pubkey": "4v2w3y24",
+      "type": "sng",
+      "handsCompleted": 0,
+      "totalPot": 0,
+      "totalRake": 0,
+      "stuck": false,
+      "lastActivityMs": 1774313447211
+    },
+    {
+      "pubkey": "9qm698GV",
+      "type": "sng",
+      "handsCompleted": 0,
+      "totalPot": 0,
+      "totalRake": 0,
+      "stuck": false,
+      "lastActivityMs": 1774313447069
+    },
+    {
+      "pubkey": "2Ljf8qh7",
+      "type": "sng",
+      "handsCompleted": 0,
+      "totalPot": 0,
+      "totalRake": 0,
+      "stuck": false,
+      "lastActivityMs": 1774313446457
+    },
+    {
+      "pubkey": "2RJPbj95",
+      "type": "sng",
+      "handsCompleted": 0,
+      "totalPot": 0,
+      "totalRake": 0,
+      "stuck": false,
+      "lastActivityMs": 1774313447093
+    },
+    {
+      "pubkey": "E7TuP7zd",
+      "type": "sng",
+      "handsCompleted": 0,
+      "totalPot": 0,
+      "totalRake": 0,
+      "stuck": false,
+      "lastActivityMs": 1774313447211
+    },
+    {
+      "pubkey": "Bcm8ZLuy",
+      "type": "sng",
+      "handsCompleted": 0,
+      "totalPot": 0,
+      "totalRake": 0,
+      "stuck": false,
+      "lastActivityMs": 1774313446456
+    },
+    {
+      "pubkey": "4tuBE1RH",
+      "type": "sng",
+      "handsCompleted": 0,
+      "totalPot": 0,
+      "totalRake": 0,
+      "stuck": false,
+      "lastActivityMs": 1774313446447
+    },
+    {
+      "pubkey": "Hgfbhnw6",
+      "type": "sng",
+      "handsCompleted": 0,
+      "totalPot": 0,
+      "totalRake": 0,
+      "stuck": false,
+      "lastActivityMs": 1774313447183
+    }
+  ],
+  "totalHandsCompleted": 120,
+  "totalRakeCollected": 0,
+  "playersClaimedUnrefined": 20,
+  "playersStaked": 0,
+  "raceConditions": [],
+  "stuckTables": 0
+}

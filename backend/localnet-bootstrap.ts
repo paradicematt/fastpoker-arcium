@@ -80,10 +80,17 @@ async function main() {
     console.log('  ⚠ Stale state — re-bootstrapping');
   }
 
-  // Admin keypair
-  const admin = Keypair.generate();
-  await conn.confirmTransaction(await conn.requestAirdrop(admin.publicKey, 10 * LAMPORTS_PER_SOL), 'confirmed');
-  console.log(`  Admin: ${admin.publicKey.toBase58().slice(0, 12)}.. (10 SOL)`);
+  // Admin keypair — must be SUPER_ADMIN (default Solana keypair) for init_dealer_registry etc.
+  const homedir = process.env.HOME || '/root';
+  const idPath = path.join(homedir, '.config', 'solana', 'id.json');
+  const admin = fs.existsSync(idPath)
+    ? Keypair.fromSecretKey(Uint8Array.from(JSON.parse(fs.readFileSync(idPath, 'utf8'))))
+    : Keypair.generate();
+  const bal = await conn.getBalance(admin.publicKey);
+  if (bal < 5 * LAMPORTS_PER_SOL) {
+    await conn.confirmTransaction(await conn.requestAirdrop(admin.publicKey, 10 * LAMPORTS_PER_SOL), 'confirmed');
+  }
+  console.log(`  Admin: ${admin.publicKey.toBase58().slice(0, 12)}.. (${(await conn.getBalance(admin.publicKey) / LAMPORTS_PER_SOL).toFixed(0)} SOL)`);
 
   // Fund treasury
   await conn.confirmTransaction(await conn.requestAirdrop(TREASURY, 1 * LAMPORTS_PER_SOL), 'confirmed');

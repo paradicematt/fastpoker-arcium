@@ -139,7 +139,10 @@ async function send(conn: Connection, ix: TransactionInstruction, signers: Keypa
     if (!quiet) console.log(`  ✅ ${label}: ${sig.slice(0, 20)}...`);
     return sig;
   } catch (e: any) {
-    if (!quiet) console.log(`  ❌ ${label}: ${e.message?.slice(0, 100)}`);
+    const msg = e.message?.slice(0, 150) || String(e);
+    if (!quiet) console.log(`  ❌ ${label}: ${msg}`);
+    // Also log program logs if available
+    if (e.logs) console.log(`    Logs: ${e.logs.filter((l: string) => l.includes('Error') || l.includes('failed')).join(' | ')}`);
     return null;
   }
 }
@@ -179,14 +182,14 @@ async function ensureRegistered(conn: Connection, kp: Keypair) {
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
     data: IX.register_player,
-  }), [kp], `register ${kp.publicKey.toBase58().slice(0, 8)}`, true);
+  }), [kp], `register ${kp.publicKey.toBase58().slice(0, 8)}`, false);
 }
 
 async function registerCrank(conn: Connection, kp: Keypair): Promise<boolean> {
   // Fund crank
   const bal = await conn.getBalance(kp.publicKey);
-  if (bal < 5 * LAMPORTS_PER_SOL) {
-    await conn.confirmTransaction(await conn.requestAirdrop(kp.publicKey, 10 * LAMPORTS_PER_SOL), 'confirmed');
+  if (bal < 15 * LAMPORTS_PER_SOL) {
+    await conn.confirmTransaction(await conn.requestAirdrop(kp.publicKey, 20 * LAMPORTS_PER_SOL), 'confirmed');
   }
 
   // Register CrankOperator
@@ -201,7 +204,7 @@ async function registerCrank(conn: Connection, kp: Keypair): Promise<boolean> {
         { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       ],
       data: IX.register_crank_operator,
-    }), [kp], `crank_op ${kp.publicKey.toBase58().slice(0, 8)}`, true);
+    }), [kp], `crank_op ${kp.publicKey.toBase58().slice(0, 8)}`, false);
     if (!sig) return false;
   }
 
@@ -221,7 +224,7 @@ async function registerCrank(conn: Connection, kp: Keypair): Promise<boolean> {
         { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       ],
       data: IX.purchase_dealer_license,
-    }), [kp], `dealer_lic ${kp.publicKey.toBase58().slice(0, 8)}`, true);
+    }), [kp], `dealer_lic ${kp.publicKey.toBase58().slice(0, 8)}`, false);
     if (!sig) return false;
   }
   return true;
@@ -249,7 +252,7 @@ async function createTable(
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
     data: Buffer.concat([IX.create_table, cfg]),
-  }), [creator], `create_table`, true);
+  }), [creator], `create_table ${tablePda.toBase58().slice(0, 8)}`, false);
 
   if (!sig) return null;
 
@@ -407,27 +410,33 @@ async function main() {
 
   const playerKps: Keypair[] = [];
   for (let i = 0; i < NUM_PLAYERS; i++) {
-    const seed = crypto.createHash('sha256').update(`stress-player-v1-${i}`).digest();
+    const seed = crypto.createHash('sha256').update(`stress-player-${Date.now()}-${i}`).digest();
     playerKps.push(Keypair.fromSeed(seed));
   }
 
-  // Fund in batches of 10
-  for (let batch = 0; batch < playerKps.length; batch += 10) {
-    const batchKps = playerKps.slice(batch, batch + 10);
-    await Promise.all(batchKps.map(async (kp) => {
+  // Fund sequentially to avoid RPC rate limits
+  for (let i = 0; i < playerKps.length; i++) {
+    const kp = playerKps[i];
+    try {
       const bal = await conn.getBalance(kp.publicKey);
       if (bal < PLAYER_SOL * LAMPORTS_PER_SOL / 2) {
-        await conn.confirmTransaction(
-          await conn.requestAirdrop(kp.publicKey, PLAYER_SOL * LAMPORTS_PER_SOL),
-          'confirmed'
-        );
+        const sig = await conn.requestAirdrop(kp.publicKey, PLAYER_SOL * LAMPORTS_PER_SOL);
+        await conn.confirmTransaction(sig, 'confirmed');
       }
-    }));
-    console.log(`  Funded batch ${batch / 10 + 1}/${Math.ceil(playerKps.length / 10)}`);
+    } catch (e: any) {
+      // Retry once on timeout
+      try {
+        const sig = await conn.requestAirdrop(kp.publicKey, PLAYER_SOL * LAMPORTS_PER_SOL);
+        await conn.confirmTransaction(sig, 'confirmed');
+      } catch {}
+    }
+    if ((i + 1) % 10 === 0) console.log(`  Funded ${i + 1}/${playerKps.length}`);
   }
 
-  // Register all players
-  await Promise.all(playerKps.map(kp => ensureRegistered(conn, kp)));
+  // Register all players (sequential to avoid RPC overload)
+  for (const kp of playerKps) {
+    await ensureRegistered(conn, kp);
+  }
   console.log(`  ✅ ${NUM_PLAYERS} players funded (${PLAYER_SOL} SOL) + registered\n`);
 
   // ══════════════════════════════════════════════
@@ -544,18 +553,25 @@ async function main() {
 
     console.log(`\n  📊 [${elapsed}s] Hands: ${totalHands} | Stuck: ${stuckCount}/${tables.length}`);
 
-    // Check for stuck tables
+    // Check for stuck tables (skip completed SNGs)
     for (const tm of metrics.tables) {
       if (Date.now() - tm.lastActivityMs > 120_000 && !tm.stuck) {
-        tm.stuck = true;
-        metrics.stuckTables++;
-        // Check phase
+        // Check phase before marking stuck
         try {
           const tbl = tables.find(t => t.metrics === tm);
           if (tbl) {
             const info = await conn.getAccountInfo(tbl.pda);
             if (info) {
-              const phase = Buffer.from(info.data)[T.PHASE];
+              const data = Buffer.from(info.data);
+              const phase = data[T.PHASE];
+              const curPlayers = data[T.CUR_PLAYERS];
+              // SNG in Waiting with <=1 player = completed, not stuck
+              if (tm.type === 'sng' && phase === 0 && curPlayers <= 1) {
+                tm.stuckPhase = 'Complete';
+                continue; // skip — this SNG finished naturally
+              }
+              tm.stuck = true;
+              metrics.stuckTables++;
               tm.stuckPhase = PHASE_NAMES[phase] || `Unknown(${phase})`;
               console.log(`    ⚠️  ${tm.pubkey} stuck in ${tm.stuckPhase}`);
             }
