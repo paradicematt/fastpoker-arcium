@@ -742,8 +742,8 @@ function TestConsole() {
               <Stat label="Hand" value={`#${tableState.handNumber}`} color="gray" />
               <Stat label="Players" value={`${tableState.currentPlayers}/${tableState.maxPlayers}`} color="emerald" />
               <Stat label="Type" value={GAME_TYPES[tableState.gameType] || '?'} color="purple" />
-              <Stat label="Pot" value={tableState.pot.toLocaleString()} color="amber" />
-              <Stat label="MinBet" value={tableState.minBet.toLocaleString()} color="amber" />
+              <Stat label="Pot" value={`${(tableState.pot / 1e9).toFixed(4)} SOL`} color="amber" />
+              <Stat label="MinBet" value={`${(tableState.minBet / 1e9).toFixed(4)} SOL`} color="amber" />
               <Stat label="Turn" value={`Seat ${tableState.currentPlayer}`} color="cyan" />
               <Stat label="Delegated" value={tableState.isDelegated ? 'Yes' : 'No'} color={tableState.isDelegated ? 'emerald' : 'red'} />
             </div>

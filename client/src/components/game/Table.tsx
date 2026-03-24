@@ -58,7 +58,7 @@ export function Table({ className }: TableProps) {
           {pot > 0 && (
             <div className="bg-black/40 px-4 py-2 rounded-full">
               <span className="text-yellow-400 font-bold text-lg">
-                Pot: {pot.toLocaleString()}
+                Pot: {(pot / 1e9).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 4 })} SOL
               </span>
             </div>
           )}
