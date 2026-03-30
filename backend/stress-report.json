@@ -1,6 +1,6 @@
 {
-  "startTime": 1774310947385,
-  "endTime": 1774313452514,
+  "startTime": 1774896411128,
+  "endTime": 1774898333642,
   "cranks": [
     {
       "pubkey": "CDq5ANhv",
@@ -110,187 +110,197 @@
   ],
   "tables": [
     {
-      "pubkey": "JAAy5Yp5",
+      "pubkey": "4wB8Zx4F",
       "type": "cash",
-      "handsCompleted": 18,
+      "handsCompleted": 8,
       "totalPot": 0,
       "totalRake": 0,
       "stuck": false,
-      "lastActivityMs": 1774313441147
+      "lastActivityMs": 1774898327892
     },
     {
-      "pubkey": "2SUvy6Kh",
+      "pubkey": "7KfSFEat",
       "type": "cash",
-      "handsCompleted": 18,
+      "handsCompleted": 8,
       "totalPot": 0,
       "totalRake": 0,
       "stuck": false,
-      "lastActivityMs": 1774313446596
+      "lastActivityMs": 1774898328299
     },
     {
-      "pubkey": "HoxkUQw4",
+      "pubkey": "HgV5SXRe",
       "type": "cash",
-      "handsCompleted": 18,
+      "handsCompleted": 8,
       "totalPot": 0,
       "totalRake": 0,
       "stuck": false,
-      "lastActivityMs": 1774313446941
+      "lastActivityMs": 1774898327486
     },
     {
-      "pubkey": "9ifcesMK",
+      "pubkey": "CcYQfQGT",
       "type": "cash",
-      "handsCompleted": 17,
+      "handsCompleted": 8,
       "totalPot": 0,
       "totalRake": 0,
       "stuck": false,
-      "lastActivityMs": 1774313441094
+      "lastActivityMs": 1774898327500
     },
     {
-      "pubkey": "Awfxy9NM",
+      "pubkey": "9ty6v4dB",
       "type": "cash",
-      "handsCompleted": 17,
+      "handsCompleted": 8,
       "totalPot": 0,
       "totalRake": 0,
       "stuck": false,
-      "lastActivityMs": 1774313446577
+      "lastActivityMs": 1774898327487
     },
     {
-      "pubkey": "78X5DpgX",
+      "pubkey": "8Vz11vBZ",
       "type": "cash",
-      "handsCompleted": 16,
+      "handsCompleted": 8,
       "totalPot": 0,
       "totalRake": 0,
       "stuck": false,
-      "lastActivityMs": 1774313441087
+      "lastActivityMs": 1774898327491
     },
     {
-      "pubkey": "6nL8BXZe",
+      "pubkey": "9YRxv7Qt",
       "type": "cash",
-      "handsCompleted": 16,
+      "handsCompleted": 8,
       "totalPot": 0,
       "totalRake": 0,
       "stuck": false,
-      "lastActivityMs": 1774313447212
+      "lastActivityMs": 1774898327491
     },
     {
-      "pubkey": "Gd1x5nea",
+      "pubkey": "Fsm9qfPo",
       "type": "cash",
-      "handsCompleted": 0,
+      "handsCompleted": 8,
       "totalPot": 0,
       "totalRake": 0,
       "stuck": false,
-      "lastActivityMs": 1774313447078
+      "lastActivityMs": 1774898328300
     },
     {
-      "pubkey": "2iKa9CG2",
+      "pubkey": "FrKFVBft",
       "type": "cash",
-      "handsCompleted": 0,
+      "handsCompleted": 8,
       "totalPot": 0,
       "totalRake": 0,
       "stuck": false,
-      "lastActivityMs": 1774313447410
+      "lastActivityMs": 1774898327488
     },
     {
-      "pubkey": "HZPXwXRa",
+      "pubkey": "69bXEdDr",
       "type": "cash",
-      "handsCompleted": 0,
+      "handsCompleted": 8,
       "totalPot": 0,
       "totalRake": 0,
       "stuck": false,
-      "lastActivityMs": 1774313447093
+      "lastActivityMs": 1774898327490
     },
     {
-      "pubkey": "HnD3pBCC",
+      "pubkey": "5cxpC3ZQ",
       "type": "sng",
-      "handsCompleted": 0,
+      "handsCompleted": 1,
       "totalPot": 0,
       "totalRake": 0,
       "stuck": false,
-      "lastActivityMs": 1774313447212
+      "lastActivityMs": 1774896629611,
+      "stuckPhase": "Complete"
     },
     {
-      "pubkey": "Fecfx2ve",
+      "pubkey": "2ah29UYi",
       "type": "sng",
-      "handsCompleted": 0,
+      "handsCompleted": 1,
       "totalPot": 0,
       "totalRake": 0,
       "stuck": false,
-      "lastActivityMs": 1774313447078
+      "lastActivityMs": 1774896849656,
+      "stuckPhase": "Complete"
     },
     {
-      "pubkey": "4v2w3y24",
+      "pubkey": "2au9nJPY",
       "type": "sng",
-      "handsCompleted": 0,
+      "handsCompleted": 1,
       "totalPot": 0,
       "totalRake": 0,
       "stuck": false,
-      "lastActivityMs": 1774313447211
+      "lastActivityMs": 1774896879435,
+      "stuckPhase": "Complete"
     },
     {
-      "pubkey": "9qm698GV",
+      "pubkey": "B3b7ud4D",
       "type": "sng",
-      "handsCompleted": 0,
+      "handsCompleted": 1,
       "totalPot": 0,
       "totalRake": 0,
       "stuck": false,
-      "lastActivityMs": 1774313447069
+      "lastActivityMs": 1774896629506,
+      "stuckPhase": "Complete"
     },
     {
-      "pubkey": "2Ljf8qh7",
+      "pubkey": "971Qa9gV",
       "type": "sng",
-      "handsCompleted": 0,
+      "handsCompleted": 1,
       "totalPot": 0,
       "totalRake": 0,
       "stuck": false,
-      "lastActivityMs": 1774313446457
+      "lastActivityMs": 1774896634953,
+      "stuckPhase": "Complete"
     },
     {
-      "pubkey": "2RJPbj95",
+      "pubkey": "F2qsPwHt",
       "type": "sng",
-      "handsCompleted": 0,
+      "handsCompleted": 1,
       "totalPot": 0,
       "totalRake": 0,
       "stuck": false,
-      "lastActivityMs": 1774313447093
+      "lastActivityMs": 1774896631035,
+      "stuckPhase": "Complete"
     },
     {
-      "pubkey": "E7TuP7zd",
+      "pubkey": "AN6RLZzF",
       "type": "sng",
-      "handsCompleted": 0,
+      "handsCompleted": 1,
       "totalPot": 0,
       "totalRake": 0,
       "stuck": false,
-      "lastActivityMs": 1774313447211
+      "lastActivityMs": 1774896631915,
+      "stuckPhase": "Complete"
     },
     {
-      "pubkey": "Bcm8ZLuy",
+      "pubkey": "DTvtHTDT",
       "type": "sng",
-      "handsCompleted": 0,
+      "handsCompleted": 1,
       "totalPot": 0,
       "totalRake": 0,
       "stuck": false,
-      "lastActivityMs": 1774313446456
+      "lastActivityMs": 1774896631233,
+      "stuckPhase": "Complete"
     },
     {
-      "pubkey": "4tuBE1RH",
+      "pubkey": "29xjNkVc",
       "type": "sng",
-      "handsCompleted": 0,
+      "handsCompleted": 1,
       "totalPot": 0,
       "totalRake": 0,
       "stuck": false,
-      "lastActivityMs": 1774313446447
+      "lastActivityMs": 1774896879454,
+      "stuckPhase": "Complete"
     },
     {
-      "pubkey": "Hgfbhnw6",
+      "pubkey": "6rbPRS8u",
       "type": "sng",
-      "handsCompleted": 0,
+      "handsCompleted": 1,
       "totalPot": 0,
       "totalRake": 0,
       "stuck": false,
-      "lastActivityMs": 1774313447183
+      "lastActivityMs": 1774896879455,
+      "stuckPhase": "Complete"
     }
   ],
-  "totalHandsCompleted": 120,
+  "totalHandsCompleted": 90,
   "totalRakeCollected": 0,
   "playersClaimedUnrefined": 20,
   "playersStaked": 0,
