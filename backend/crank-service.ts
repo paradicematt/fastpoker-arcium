@@ -5218,7 +5218,7 @@ class CrankService {
       this.sweepStuckTables().catch((e) =>
         console.warn(`  ⚠️  ER sweep error: ${e?.message?.slice(0, 80)}`),
       );
-      this.sweepL1SngTables().catch((e) =>
+      this.sweepL1Tables().catch((e) =>
         console.warn(`  ⚠️  L1 SNG sweep error: ${e?.message?.slice(0, 80)}`),
       );
     }, 30_000);
@@ -5232,7 +5232,7 @@ class CrankService {
    * (e.g. /api/sitngos/ready wasn't called or failed).
    * Flow: create permissions → delegate permissions → delegate accounts → add to tracking → crank starts game.
    */
-  private async sweepL1SngTables(): Promise<void> {
+  private async sweepL1Tables(): Promise<void> {
     if (!this.l1Payer) return;
     if (!crankConfig.crank_sng) return;
 
@@ -5260,15 +5260,18 @@ class CrankService {
         if (data.length < 385) continue;
 
         const gameType = data[OFF.GAME_TYPE];
-        // Skip cash games (type 3) — they have their own flow
-        if (gameType === 3) continue;
-
         const maxP = data[OFF.MAX_PLAYERS];
         const curP = data[OFF.CURRENT_PLAYERS];
         const handNum = Number(data.readBigUInt64LE(OFF.HAND_NUMBER));
 
-        // Only promote full tables that haven't started yet
-        if (curP < maxP || handNum > 0) continue;
+        // SNG: only promote full tables that haven't started yet
+        // Cash: promote any table with 2+ players
+        const isCash = gameType === 3;
+        if (isCash) {
+          if (curP < 2) continue;
+        } else {
+          if (curP < maxP || handNum > 0) continue;
+        }
 
         const key = tablePda.toBase58();
         // Skip if already tracked, processing, blocked, or filtered
@@ -5280,7 +5283,7 @@ class CrankService {
         // Arcium architecture: all tables stay on L1, no TEE delegation needed.
         // Just add to tracking — the crank loop handles start_game + arcium_deal.
         console.log(
-          `\n🚀 L1 SNG discovered: ${key.slice(0, 12)}... (${curP}/${maxP} players, type=${gameType}, hand#=${handNum})`,
+          `\n🚀 L1 table discovered: ${key.slice(0, 12)}... (${curP}/${maxP} players, type=${isCash ? 'cash' : 'SNG'}, hand#=${handNum})`,
         );
 
         const state = parseTable(data);
